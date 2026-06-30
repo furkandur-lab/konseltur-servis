@@ -1640,7 +1640,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-7</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-9</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -13978,7 +13978,14 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="field"><label>Referans</label><input id="cm-bsv-referans" maxlength="150" placeholder="Referans kişi veya kurum..."></div>
     </div>
 
-    <div class="field"><label>Not / Açıklama</label><input id="cm-not" maxlength="200" placeholder="Opsiyonel açıklama..."></div>
+    <div class="field">
+      <label>Not / Açıklama</label>
+      <textarea id="cm-not" maxlength="500" rows="3" placeholder="Opsiyonel açıklama... (Enter ile alt satıra geçebilirsiniz)" style="width:100%;padding:10px 12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;outline:none;font-family:'Outfit',sans-serif;resize:vertical;min-height:64px;line-height:1.5;"></textarea>
+    </div>
+    <div class="field">
+      <label>Firma Kaşe / Adres Bilgileri <span style="font-weight:400;color:var(--muted);font-size:10px;">(faturalarda/dökümlerde kullanılabilir)</span></label>
+      <textarea id="cm-kase-adres" maxlength="500" rows="4" placeholder="Örn:&#10;ABC Lojistik Tic. Ltd. Şti.&#10;Vergi No: 1234567890&#10;Adres: Örnek Mah. Test Cad. No:1 Konya&#10;Tel: 0332 XXX XX XX" style="width:100%;padding:10px 12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:12px;outline:none;font-family:'Outfit',sans-serif;resize:vertical;min-height:84px;line-height:1.6;white-space:pre-wrap;"></textarea>
+    </div>
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button class="btn btn-full" style="flex:1;background:linear-gradient(135deg,rgba(59,130,246,.25),rgba(59,130,246,.15));border:1px solid rgba(59,130,246,.45);color:#93c5fd;box-shadow:0 4px 18px rgba(59,130,246,.2);" onclick="saveCariModal()">Kaydet</button>
       <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('cari-add-modal').classList.remove('open')">İptal</button>
@@ -14017,7 +14024,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <!-- Tutar -->
     <div class="field">
       <label>Tutar (₺)</label>
-      <input id="ch-tutar" type="number" placeholder="0" min="0.01" step="0.01" max="99999999" style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:#60a5fa;">
+      <input id="ch-tutar" type="number" placeholder="0 (boş bırakılabilir)" min="0" step="0.01" max="99999999" style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:#60a5fa;">
     </div>
 
     <!-- Açıklama -->
@@ -14317,7 +14324,7 @@ function renderCariDetay(id){
       <div style="flex:1;">
         <div style="font-weight:700;font-size:16px;">${_esc(c.isim||'')}</div>
         <div style="font-size:12px;color:var(--muted2);margin-top:2px;">${c.firma?'🏢 '+_esc(c.firma)+' &nbsp; ':''}${c.tel?'📱 '+_esc(c.tel)+' &nbsp; ':''}${c.plaka?'🚗 '+_esc(c.plaka):''}</div>
-        ${c.not?'<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic;">'+_esc(c.not)+'</div>':''}
+        ${c.not?'<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic;white-space:pre-wrap;">'+_esc(c.not)+'</div>':''}
       </div>
       <button onclick="deleteCari('${id}')" style="display:${window._kasaModOnly?'none':'inline-flex'};padding:8px 12px;border-radius:9px;border:1px solid rgba(239,68,68,.2);background:rgba(239,68,68,.06);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;">Sil</button>
     </div>
@@ -14412,7 +14419,8 @@ function renderCariDetay(id){
         <span style="font-size:12px;color:var(--muted2);font-weight:600;flex-shrink:0;">Referans</span>
         <span style="font-size:12px;font-weight:600;color:var(--text);">${_esc(bsv.referans)}</span>
       </div>` : ''}
-      ${c.not ? `<div style="padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;font-size:12px;color:var(--muted2);font-style:italic;">${_esc(c.not)}</div>` : ''}
+      ${c.not ? `<div style="padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;font-size:12px;color:var(--muted2);font-style:italic;white-space:pre-wrap;">${_esc(c.not)}</div>` : ''}
+      ${c.kaseAdres ? `<div style="margin-top:8px;padding:12px 14px;background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.15);border-radius:12px;font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.6;"><div style="font-size:10px;color:#a5b4fc;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;">📋 Firma Kaşe / Adres Bilgileri</div>${_esc(c.kaseAdres)}</div>` : ''}
     </div>`;
     return;
   }
@@ -14575,7 +14583,7 @@ function openCariAddModal(){
   try{
     document.getElementById('cari-modal-title').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" style="vertical-align:middle;margin-right:6px;"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/></svg> ' + (window._kasaModOnly ? 'Yeni Kasa Hareketi' : 'Yeni Cari Hesap');
     document.getElementById('cari-edit-id').value='';
-    ['cm-isim','cm-plaka','cm-firma','cm-tel','cm-not'].forEach(x=>{ const el=document.getElementById(x); if(el) el.value=''; });
+    ['cm-isim','cm-plaka','cm-firma','cm-tel','cm-not','cm-kase-adres'].forEach(x=>{ const el=document.getElementById(x); if(el) el.value=''; });
     const _kodEl2=document.getElementById('cm-kod');
     if(_kodEl2){ try{ _kodEl2.value=_autoKodUret(); }catch(e){ _kodEl2.value=''; } }
     const _cmTur = document.getElementById('cm-tur');
@@ -14616,6 +14624,8 @@ function openCariEditModal(id){
   document.getElementById('cm-firma').value=c.firma||'';
   document.getElementById('cm-tel').value=c.tel||'';
   document.getElementById('cm-not').value=c.not||'';
+  const _kaseEl = document.getElementById('cm-kase-adres');
+  if(_kaseEl) _kaseEl.value=c.kaseAdres||'';
   // Okul-yövmiye satırlarını temizle ve doldur
   const _rows = document.getElementById('cm-okul-rows');
   if(_rows) _rows.innerHTML = '';
@@ -14643,6 +14653,8 @@ function saveCariModal(){
   _cariData[id].firma=(document.getElementById('cm-firma').value||'').trim();
   _cariData[id].tel=(document.getElementById('cm-tel').value||'').trim();
   _cariData[id].not=(document.getElementById('cm-not').value||'').trim();
+  const _kaseAdresEl = document.getElementById('cm-kase-adres');
+  _cariData[id].kaseAdres=_kaseAdresEl?(_kaseAdresEl.value||'').trim():'';
   const _kodEl = document.getElementById('cm-kod');
   if(_kodEl) _cariData[id].kod = _kodEl.value.trim().toUpperCase();
   const _tur = _cariData[id].tur;
@@ -14718,8 +14730,8 @@ function _setChTip(tip,btn){
 function saveCariHareket(){
   const id=window._activeCariId;
   if(!id||!_cariData[id]) return;
-  const tutar=parseFloat(document.getElementById('ch-tutar').value);
-  if(!tutar||tutar<=0){ showToast('Geçerli bir tutar girin','error'); return; }
+  const tutar=parseFloat(document.getElementById('ch-tutar').value)||0;
+  if(tutar<0){ showToast('Tutar negatif olamaz','error'); return; }
   const tip=document.getElementById('ch-tip').value;
   const tarih=document.getElementById('ch-tarih').value||new Date().toISOString().split('T')[0];
   const aciklama=(document.getElementById('ch-aciklama').value||'').trim();
