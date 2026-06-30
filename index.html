@@ -1640,7 +1640,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-6</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-7</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -14023,8 +14023,8 @@ document.addEventListener('DOMContentLoaded',function(){
     <!-- Açıklama -->
     <div class="field"><label>Açıklama</label><input id="ch-aciklama" maxlength="200" placeholder="Örn: Ocak ayı yevmiye, Avans..."></div>
 
-    <!-- Karşı Hesap -->
-    <div class="field">
+    <!-- Karşı Hesap (sadece Kasa Cari için görünür) -->
+    <div class="field" id="ch-karsi-hesap-field">
       <label>Karşı Hesap <span style="font-weight:400;color:var(--muted);font-size:10px;">(opsiyonel — seçilirse otomatik yansır)</span></label>
       <select id="ch-karsi-hesap" style="color-scheme:dark;background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;width:100%;font-family:Outfit,sans-serif;font-size:13px;outline:none;">
         <option value="">— Karşı hesap seçin —</option>
@@ -14672,9 +14672,14 @@ function saveCariModal(){
 function openCariHareketModal(){
   const id=window._activeCariId;
   if(!id||!_cariData[id]) return;
+  const _aktifCari = _cariData[id];
+  const _isKasa = _aktifCari.tur === 'kasa';
+  // Karşı Hesap alanı sadece Kasa Cari'de görünsün
+  const karsiField = document.getElementById('ch-karsi-hesap-field');
+  if(karsiField) karsiField.style.display = _isKasa ? '' : 'none';
   // Karşı hesap listesini doldur
   const karsiSel = document.getElementById('ch-karsi-hesap');
-  if(karsiSel){
+  if(karsiSel && _isKasa){
     karsiSel.innerHTML = '<option value="">— Seçin (otomatik yansır) —</option>';
     Object.entries(_cariData).forEach(function(entry){
       const key = entry[0], c = entry[1];
@@ -14722,9 +14727,10 @@ function saveCariHareket(){
   const hid=_newHareketId();
   const hObj={tarih,aciklama:aciklama||(tip==='borc'?'Alınan':'Verilen'),borc:tip==='borc'?tutar:0,alacak:tip==='alacak'?tutar:0,ts:Date.now()};
   _cariData[id].hareketler[hid]=hObj;
-  // Karşı hesap seçilmişse oraya da ters hareket ekle
+  // Karşı hesap seçilmişse oraya da ters hareket ekle (sadece Kasa Cari'de aktif)
+  const _isKasaCari = _cariData[id].tur === 'kasa';
   const karsiSel = document.getElementById('ch-karsi-hesap');
-  const karsiId = karsiSel ? karsiSel.value : '';
+  const karsiId = (_isKasaCari && karsiSel) ? karsiSel.value : '';
   // _cariData'da bu ID var mı - string ve sayısal her iki formatta dene
   // karsiId artık _cariData key'i - direkt erişim
   const _karsiCari = karsiId ? _cariData[karsiId] : null;
