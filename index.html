@@ -1640,7 +1640,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-5</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-6</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -3512,6 +3512,7 @@ setInterval(updateLoginClock, 30000);
         <div id="ucret-sofor-ozet" style="font-size:11px;color:var(--muted2);margin-top:2px;"></div>
       </div>
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openSoforTahsilatCarisi()" style="display:flex;align-items:center;gap:6px;">💳 Tahsilat Carisi</button>
         <button class="btn btn-green btn-sm" onclick="openUcretAddModal()">+ Öğrenci Ekle</button>
       </div>
     </div>
@@ -3912,6 +3913,18 @@ setInterval(updateLoginClock, 30000);
 </div>
 
 <!-- Ödeme Modal -->
+<!-- Şoför Tahsilat Carisi Modal -->
+<div class="modal-bg" id="sofor-tahsilat-modal" onclick="if(event.target===this){document.getElementById('sofor-tahsilat-modal').classList.remove('open')}">
+ <div class="modal" style="max-width:680px;">
+ <h2>💳 Tahsilat Carisi</h2>
+ <div style="font-size:13px;color:var(--muted2);margin-bottom:14px;" id="sofor-tahsilat-sub">–</div>
+ <div id="sofor-tahsilat-body" style="max-height:480px;overflow-y:auto;"></div>
+ <div style="margin-top:18px;display:flex;gap:8px;">
+  <button class="btn btn-ghost" onclick="document.getElementById('sofor-tahsilat-modal').classList.remove('open')">Kapat</button>
+ </div>
+ </div>
+</div>
+
 <div class="modal-bg" id="payment-modal" onclick="if(event.target===this){document.getElementById('payment-modal').classList.remove('open')}">
  <div class="modal" style="width:660px;max-width:96vw;">
  <h2 id="pm-title">Öğrenci Ödemeleri</h2>
@@ -12017,6 +12030,72 @@ function _getSoforOgrenciListesi(soforId){
   const s = window._soforOgrenciler;
   if(!s) return [];
   return s[String(soforId)] || s[soforId] || [];
+}
+
+// ŞOFÖR TAHSİLAT CARİSİ — o şoföre/araca atanmış öğrencilerin tüm ödeme hareketlerini
+// tarihe göre sıralı (yeniden eskiye) liste halinde gösterir
+function openSoforTahsilatCarisi(){
+ const drvId = window._ucretActiveSoforId;
+ if(!drvId){ toast('Önce bir şoför seçin','error'); return; }
+ const drv = soforler.find(d=>d.id===drvId);
+ if(!drv){ toast('Şoför bulunamadı','error'); return; }
+
+ // Bu şoföre atanmış tüm öğrencileri topla (students + sofor-ogrenci map'i)
+ const ogrList = _getSoforOgrenciListesi(drvId);
+ const idSet = new Set(ogrList.map(o=>o.id));
+ students.forEach(s=>{ if(s.soforId===drvId) idSet.add(s.id); });
+
+ // Tüm ödeme hareketlerini tarihe göre topla
+ const hareketler = [];
+ idSet.forEach(sid=>{
+  const s = students.find(x=>x.id===sid) || ogrList.find(o=>o.id===sid);
+  const p = payments[sid];
+  if(!s || !p) return;
+  AYLAR.forEach(a=>{
+   const mp = p[a.key];
+   if(mp && mp.paid && mp.tarih){
+    hareketler.push({
+     tarih: mp.tarih,
+     ogrenciAdi: s.name,
+     ay: a.label,
+     tutar: Number(mp.amount||0),
+     odeme: mp.odeme||'nakit'
+    });
+   }
+  });
+ });
+
+ // Tarihe göre yeniden eskiye sırala
+ hareketler.sort((a,b)=> b.tarih.localeCompare(a.tarih));
+
+ const toplam = hareketler.reduce((t,h)=>t+h.tutar,0);
+ const bugun = new Date().toISOString().slice(0,10);
+ const bugunToplam = hareketler.filter(h=>h.tarih===bugun).reduce((t,h)=>t+h.tutar,0);
+
+ const sub = document.getElementById('sofor-tahsilat-sub');
+ const body = document.getElementById('sofor-tahsilat-body');
+
+ sub.innerHTML = `<b style="color:#fff;">${escHtml(drv.name)}</b> — Toplam tahsilat: <b style="color:var(--green);">₺${toplam.toLocaleString('tr-TR')}</b>
+  &nbsp;·&nbsp; Bugün: <b style="color:var(--amber);">₺${bugunToplam.toLocaleString('tr-TR')}</b>`;
+
+ if(!hareketler.length){
+  body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted2);">Bu şoföre ait henüz ödeme hareketi yok.</div>';
+ } else {
+  body.innerHTML = '<table class="tbl"><thead><tr><th>Tarih</th><th>Öğrenci</th><th>Ay</th><th>Ödeme</th><th style="text-align:right;">Tutar</th></tr></thead><tbody>'+
+   hareketler.map(h=>{
+    const isToday = h.tarih===bugun;
+    return `<tr style="${isToday?'background:rgba(34,197,94,.06);':''}">
+     <td style="font-size:11px;${isToday?'color:var(--green);font-weight:700;':''}">${h.tarih}${isToday?' (Bugün)':''}</td>
+     <td style="font-weight:600;">${escHtml(h.ogrenciAdi)}</td>
+     <td style="font-size:12px;color:var(--muted2);">${escHtml(h.ay)}</td>
+     <td style="font-size:11px;">${h.odeme==='eft'?'💳 EFT':'💵 Nakit'}</td>
+     <td style="text-align:right;font-weight:700;color:var(--green);">₺${h.tutar.toLocaleString('tr-TR')}</td>
+    </tr>`;
+   }).join('')+
+   '</tbody></table>';
+ }
+
+ document.getElementById('sofor-tahsilat-modal').classList.add('open');
 }
 
 function _setSoforOgrenci(soforId, ogrList){
