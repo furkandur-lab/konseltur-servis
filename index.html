@@ -281,56 +281,6 @@ body.light .field select{
 /* CARDS */
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
 
-/* DASHBOARD */
-.dash-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
-.dash-card{
- background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
- padding:16px 14px;display:flex;flex-direction:column;gap:5px;
- position:relative;overflow:hidden;transition:all var(--t-slow);
-}
-.dash-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.15);}
-.dash-card-glow{position:absolute;top:-15px;right:-15px;width:70px;height:70px;border-radius:50%;filter:blur(22px);opacity:.1;}
-.dash-card-icon{font-size:22px;line-height:1;}
-.dash-card-val{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;line-height:1.1;letter-spacing:-.5px;}
-.dash-card-label{font-size:10px;color:var(--muted2);font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-top:2px;}
-
-/* TABLE */
-.tbl{width:100%;border-collapse:collapse;font-size:13px;}
-.tbl th{text-align:left;padding:11px 14px;background:rgba(255,255,255,.025);color:var(--muted2);font-size:10px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700;border-bottom:1px solid var(--border);}
-.tbl td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;transition:background .15s;}
-.tbl tr:last-child td{border-bottom:none;}
-.tbl tr:hover td{background:rgba(255,255,255,.05);}
-
-/* FILTER CHIPS */
-.filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
-.filter-chip{padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--muted2);transition:all var(--t-fast);user-select:none;}
-.filter-chip:hover{border-color:rgba(255,255,255,.1);color:var(--text);background:rgba(255,255,255,.05);}
-.filter-chip.active{background:var(--brand);border-color:var(--brand);color:white;box-shadow:0 2px 10px rgba(200,55,26,.2);}
-
-/* SEARCH */
-.search-wrap{position:relative;margin-bottom:10px;}
-.search-wrap input{width:100%;padding:8px 11px 8px 34px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none;font-family:'Outfit',sans-serif;}
-.search-wrap input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(200,55,26,.07);outline:none;}
-.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;}
-
-/* BADGES */
-.s-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;}
-.sc-0{background:rgba(59,130,246,.15);color:#60a5fa;}
-.sc-1{background:rgba(139,92,246,.15);color:var(--purple);}
-.sc-2{background:rgba(245,158,11,.15);color:var(--amber);}
-
-/* ROUTE CARDS */
-.route-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;transition:all var(--t-slow);box-shadow:var(--shadow-sm);}
-.route-card:hover{border-color:rgba(255,255,255,.06);box-shadow:var(--shadow-md);}
-.route-header{padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
-.route-header:hover{background:rgba(255,255,255,.04);}
-.route-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
-.route-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;flex:1;}
-.route-meta{font-size:11px;color:var(--muted2);}
-.route-chev{font-size:11px;color:var(--muted);transition:transform .2s;}
-.route-card.open .route-chev{transform:rotate(180deg);}
-.route-body{display:none;padding:0 14px 14px;}
-.route-card.open .route-body{display:block;}
 /* .stop-row ana tanım aşağıdaki style bloğunda */
 .stop-num{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px;}
 .stop-info{flex:1;}
@@ -1640,7 +1590,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-11</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-13</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -2217,6 +2167,12 @@ function checkPassword(){
 function doLogout(){
   _pwVerified = false;
   try{ localStorage.removeItem('_ks_lastPage'); }catch(e){}
+  // Aktif alarm kontrol interval'ını durdur — oturum değişiminde eski interval'ın
+  // arka planda çalışmaya devam edip yeni oturumla çakışmasını önler
+  if(window._alarmIntervalId){
+    try{ clearInterval(window._alarmIntervalId); }catch(e){}
+    window._alarmIntervalId = null;
+  }
   // Firebase oturumunu kapat
   if(window._fbSignOut){
     window._fbSignOut().catch(function(e){ console.warn('Çıkış hatası:', e); });
@@ -4676,7 +4632,7 @@ function saveData(){
  const str = _serialize(payload);
  if(!str){ toast('Kayıt sırasında bir hata oluştu. Veriler geçersiz olabilir.','error'); return false; }
  // LocalStorage her zaman kaydet
- try{ localStorage.setItem(LS_MAIN(), str); }catch(e){}
+ try{ localStorage.setItem(LS_MAIN(), str); }catch(e){ console.error('localStorage yazma hatası:', e); if(e.name==='QuotaExceededError') toast('⚠️ Tarayıcı depolama alanı dolu! Eski verileri/yedekleri temizleyin.','error'); }
  // Firebase'e kaydet
  if(window._fbReady && _isOnline){
  const path = 'konseltur/' + _activeSchoolKey + '/main';
@@ -4888,9 +4844,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
  // MOBİL LOGIN EKRANI DÜZELTMESİ — CSS çalışmıyorsa JS ile zorla
  if(window.innerWidth <= 768){
    const ls = document.getElementById('login-screen');
-   const leftPanel = document.getElementById('login-left-panel');
-   const rightPanel = document.getElementById('login-right-panel');
-   const divider = ls ? ls.children[1] : null;
+   const leftPanel = document.getElementById('login-sol-panel');
+   const rightPanel = leftPanel ? leftPanel.nextElementSibling : null; // sol panelin hemen sağındaki kardeş element
+   const divider = null; // ayraç elemanı yok, mevcut yapıda gerek kalmadı
    if(ls){
      ls.style.cssText = 'display:flex;flex-direction:column;height:auto;min-height:100vh;background:var(--bg);position:relative;overflow:visible;';
    }
@@ -5218,7 +5174,7 @@ function enterSchool(key){
 // Cari Hesap'a okul seçmeden doğrudan giriş
 
 // === KASA CARİ ===
-function enterKasaDirect(){
+async function enterKasaDirect(){
   if(typeof _pwVerified!=='undefined'&&!_pwVerified){
     document.getElementById('password-screen').style.display='flex'; return;
   }
@@ -5270,7 +5226,7 @@ function enterKasaDirect(){
   window._cariFilter = 'kasa';
 
   // KASA cari kaydını bul ve aç
-  const _openKasa = ()=>{
+  const _openKasa = async ()=>{
     const kasaEntries = Object.entries(_cariData||{}).filter(([k,v])=>v&&v.tur==='kasa');
     if(kasaEntries.length > 0){
       const [kasaId] = kasaEntries[0];
@@ -5288,7 +5244,7 @@ function enterKasaDirect(){
         servis:'Konseltur', plaka:'', tel:'', not:'',
         hareketler:{}, ts:Date.now()
       };
-      _saveCariToStorage();
+      await _saveCariToStorage();
       window._activeCariId = newId;
       renderCariDetay(newId);
       const dtab = document.getElementById('ctab-detay');
@@ -5682,7 +5638,7 @@ function addNote(){
     return; 
   }
   const tag = document.getElementById('notepad-tag').value||'';
-  const notes = JSON.parse(localStorage.getItem('_konseltur_notes')||'[]');
+  const notes = _safeParseLS('_konseltur_notes', []);
   notes.unshift({id:Date.now(), title:title||'Başlıksız', content:body, tag,
     date:new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})});
   localStorage.setItem('_konseltur_notes', JSON.stringify(notes));
@@ -5697,12 +5653,12 @@ function addNote(){
   if(typeof toast==='function') toast('✅ Not eklendi','success');
 }
 function deleteNote(id){
-  const notes = JSON.parse(localStorage.getItem('_konseltur_notes')||'[]').filter(n=>n.id!==id);
+  const notes = _safeParseLS('_konseltur_notes', []).filter(n=>n.id!==id);
   localStorage.setItem('_konseltur_notes', JSON.stringify(notes));
   renderNotes();
 }
 function renderNotes(){
-  const allNotes = JSON.parse(localStorage.getItem('_konseltur_notes')||'[]');
+  const allNotes = _safeParseLS('_konseltur_notes', []);
   const notes = window._notesFilter==='all' ? allNotes : allNotes.filter(n=>n.tag===window._notesFilter);
   const el = document.getElementById('notes-list');
   const empty = document.getElementById('notes-empty');
@@ -5812,7 +5768,7 @@ function renderCalendar(){
   if(titleEl) titleEl.textContent = months[m]+' '+y;
   const grid = document.getElementById('cal-grid');
   if(!grid) return;
-  const events = JSON.parse(localStorage.getItem('_konseltur_cal_events')||'{}');
+  const events = _safeParseLS('_konseltur_cal_events', {});
   const firstDay = new Date(y,m,1).getDay();
   const startOffset = (firstDay===0)?6:firstDay-1;
   const daysInMonth = new Date(y,m+1,0).getDate();
@@ -5883,7 +5839,7 @@ function _scheduleSwAlarms(){
   if(!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready.then(reg=>{
     if(!reg.active) return;
-    const events = JSON.parse(localStorage.getItem('_konseltur_cal_events')||'{}');
+    const events = _safeParseLS('_konseltur_cal_events', {});
     // Gelecekteki tüm alarmları SW'ye gönder
     const alarms = [];
     const now = new Date();
@@ -5906,7 +5862,7 @@ function saveCalEvent(){
   const inp = document.getElementById('cal-event-input');
   const alarmInp = document.getElementById('cal-alarm-time');
   if(!inp||!inp.value.trim()||!window._calSelected) return;
-  const events = JSON.parse(localStorage.getItem('_konseltur_cal_events')||'{}');
+  const events = _safeParseLS('_konseltur_cal_events', {});
   if(!events[window._calSelected]) events[window._calSelected]=[];
   events[window._calSelected].push({
     text: inp.value.trim(),
@@ -5927,7 +5883,7 @@ function saveCalEvent(){
 function renderCalEvents(){
   const el = document.getElementById('cal-events-list');
   if(!el||!window._calSelected) return;
-  const events = JSON.parse(localStorage.getItem('_konseltur_cal_events')||'{}');
+  const events = _safeParseLS('_konseltur_cal_events', {});
   const evs = events[window._calSelected]||[];
   if(!evs.length){el.innerHTML='';return;}
   el.innerHTML = evs.map((e,i)=>`
@@ -5941,7 +5897,7 @@ function renderCalEvents(){
 }
 
 function deleteCalEvent(key, idx){
-  const events = JSON.parse(localStorage.getItem('_konseltur_cal_events')||'{}');
+  const events = _safeParseLS('_konseltur_cal_events', {});
   if(events[key]) events[key].splice(idx,1);
   localStorage.setItem('_konseltur_cal_events', JSON.stringify(events));
   renderCalEvents();
@@ -5959,7 +5915,7 @@ function checkCalNotifications(){
   }
   const now = new Date();
   const key = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const events = JSON.parse(localStorage.getItem('_konseltur_cal_events')||'{}');
+  const events = _safeParseLS('_konseltur_cal_events', {});
   const todays = events[key]||[];
   if(todays.length>0){
     const checked = localStorage.getItem('_cal_notif_checked_'+key);
@@ -6013,7 +5969,7 @@ function _checkAlarms(){
   const hh = String(now.getHours()).padStart(2,'0');
   const mm = String(now.getMinutes()).padStart(2,'0');
   const currentTime = hh+':'+mm;
-  const events = JSON.parse(localStorage.getItem('_konseltur_cal_events')||'{}');
+  const events = _safeParseLS('_konseltur_cal_events', {});
   const todays = events[key]||[];
   todays.forEach((e,i)=>{
     if(e.alarm && e.alarm===currentTime){
@@ -6235,7 +6191,7 @@ function enterModule(mod){
      if(tCari) tCari.style.display='none';
    // Son sekmeyi hatırla
    try{
-     const _lp=JSON.parse(localStorage.getItem('_ks_lastPage')||'null');
+     const _lp=_safeParseLS('_ks_lastPage', null);
      const _validR=['dashboard','students','drivers','routes','map'];
      if(_lp&&_lp.app==='rota'&&_lp.school===_activeSchoolKey&&_validR.includes(_lp.page)){
        goto(_lp.page);
@@ -6247,7 +6203,7 @@ function enterModule(mod){
      if(tCari) tCari.style.display='none';
    // Son sekmeyi hatırla
    try{
-     const _lp2=JSON.parse(localStorage.getItem('_ks_lastPage')||'null');
+     const _lp2=_safeParseLS('_ks_lastPage', null);
      const _validU=['ucret-genel','ucret-ogrenci'];
      if(_lp2&&_lp2.app==='ucret'&&_lp2.school===_activeSchoolKey&&_validU.includes(_lp2.page)){
        switchApp('ucret'); gotoU(_lp2.page);
@@ -7514,6 +7470,18 @@ function renderDrivers(){
 // 
 function updateAll(){renderSTable();renderDrivers();renderRoutes();updateDash();updateRPanel();}
 let _toastTimer=null;
+// Güvenli localStorage JSON okuma — bozuk/geçersiz veri varsa sessizce fallback döner,
+// uygulamanın çökmesini (SyntaxError fırlatmasını) önler
+function _safeParseLS(key, fallback){
+ try{
+  const raw = localStorage.getItem(key);
+  return raw ? JSON.parse(raw) : fallback;
+ }catch(e){
+  console.warn('localStorage parse hatası ('+key+'):', e);
+  return fallback;
+ }
+}
+
 function toast(m,t='success'){
  const e=document.getElementById('toast');
  if(!e) return;
@@ -8612,7 +8580,7 @@ function renderRoutes(){
  <div class="stop-num" style="background:rgba(239,68,68,.15);color:var(--red);font-size:13px">${isSureAsimi?'⏱':''}</div>
  <div class="stop-info">
  <div class="stop-name">${escHtml(s.name)}${s.cls?` <span style="font-size:10px;color:var(--muted)">· ${escHtml(s.cls)}</span>`:''}<span style="font-size:10px;background:${SC[s.school]}22;color:${SC[s.school]};padding:1px 5px;border-radius:4px;margin-left:4px">${(SCHOOLS[s.school]||SCHOOLS[0]).short}</span></div>
- <div class="stop-addr"> ${s.ilce} / ${s.mah}${s.sok?' · '+s.sok:''}</div>
+ <div class="stop-addr"> ${escHtml(s.ilce)} / ${escHtml(s.mah)}${s.sok?' · '+escHtml(s.sok):''}</div>
  <div class="warn-inline" style="${isSureAsimi?'background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.2);color:var(--red);':''}">${msg}</div>
  </div>
  <div style="text-align:right;flex-shrink:0;">
@@ -8682,9 +8650,9 @@ function renderRoutes(){
  const rsns=(reasons[s.id]||[]).join(' &middot; ');
  return`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(239,68,68,.12);font-size:11px">
  <div>
- <span style="font-weight:600;color:var(--text)">${s.name}</span>
+ <span style="font-weight:600;color:var(--text)">${escHtml(s.name)}</span>
  ${s.cls?`<span style="color:var(--muted);margin-left:4px">${escHtml(s.cls)}</span>`:''}
- <div style="color:var(--muted);font-size:10px;margin-top:1px">&#x1F4CD; ${s.mah} &middot; ${s.sok}</div>
+ <div style="color:var(--muted);font-size:10px;margin-top:1px">&#x1F4CD; ${escHtml(s.mah)} &middot; ${escHtml(s.sok)}</div>
  </div>
  <div style="text-align:right;flex-shrink:0;margin-left:8px">
  <div style="font-size:10px;color:var(--red);font-weight:600">${rsns}</div>
@@ -8729,7 +8697,7 @@ function renderRoutes(){
  <div class="stop-num" style="background:${isOut?'rgba(239,68,68,.2)':r.color+'22'};color:${isOut?'#ef4444':r.color}">${stopN}</div>
  <div class="stop-info">
  <div class="stop-name">${escHtml(s.name)}${s.cls?` <span style="font-size:10px;color:var(--muted)">&middot; ${escHtml(s.cls)}</span>`:''}<span style="font-size:10px;background:${SC[s.school]}22;color:${SC[s.school]};padding:1px 5px;border-radius:4px;margin-left:4px">${(SCHOOLS[s.school]||SCHOOLS[0]).short}</span>${isOut?`<span class="outlier-badge">&#x26A0; AYKIRI</span>`:''}</div>
- <div class="stop-addr">&#x1F4CD; ${s.ilce} / ${s.mah} &middot; ${s.sok} No:${s.no}</div>
+ <div class="stop-addr">&#x1F4CD; ${escHtml(s.ilce)} / ${escHtml(s.mah)} &middot; ${escHtml(s.sok)} No:${escHtml(String(s.no||''))}</div>
  ${leg.pickupTime?`<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:2px">&#x1F552; Bini&#x15F;: ${leg.pickupTime}</div>`:''}
  ${isOut?`<div style="font-size:10px;color:var(--red);margin-top:1px">${outRsns}</div>`:''}
  </div>
@@ -9951,7 +9919,7 @@ function exportRotalarPDF(){
  const leg = r.legs ? r.legs.filter(l=>l.type==='stop')[i] : null;
  const time = leg ? (leg.pickupTime||'–') : '–';
  return `<tr>
- <td style="padding:6px 10px;font-weight:600;">${i+1}. ${s.name}</td>
+ <td style="padding:6px 10px;font-weight:600;">${i+1}. ${escHtml(s.name)}</td>
  <td style="padding:6px 10px;font-size:11px;color:#555;">${s.ilce||''} / ${s.mah||''}${s.sok?' · '+s.sok:''}</td>
  <td style="padding:6px 10px;font-size:11px;">${s.ph||'–'}</td>
  <td style="padding:6px 10px;font-weight:700;color:var(--green);text-align:center;">${time}</td>
@@ -10311,7 +10279,7 @@ function printUcretGenel(){
  return `<td style="text-align:center;font-size:10px;color:${paid?'var(--green)':'var(--red)'}">${paid?'':''}</td>`;
  }).join('');
  return `<tr>
- <td style="padding:4px 8px;font-weight:600;font-size:11px;">${s.name}</td>
+ <td style="padding:4px 8px;font-weight:600;font-size:11px;">${escHtml(s.name)}</td>
  ${bar}
  <td style="text-align:right;font-size:11px;font-weight:700;color:var(--green);">${tots.totalAmount.toLocaleString('tr-TR')}₺</td>
  <td style="text-align:center;font-size:10px;">${pct}%</td>
@@ -10996,10 +10964,10 @@ function openDriverSheet(driverId){
  <div style="width:32px;height:32px;border-radius:50%;background:${r.color}22;border:2px solid ${r.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${r.color};flex-shrink:0;">${idx+1}</div>
  <div style="flex:1;padding-top:4px;">
  <div style="display:flex;justify-content:space-between;align-items:baseline;">
- <div style="font-size:13px;font-weight:700;color:var(--text);">${s.name}</div>
+ <div style="font-size:13px;font-weight:700;color:var(--text);">${escHtml(s.name)}</div>
  <div style="font-size:12px;font-weight:700;color:var(--green);">${time}</div>
  </div>
- <div style="font-size:11px;color:var(--muted2);">${s.ilce} / ${s.mah}${s.sok?' · '+s.sok:''}</div>
+ <div style="font-size:11px;color:var(--muted2);">${escHtml(s.ilce)} / ${escHtml(s.mah)}${s.sok?' · '+escHtml(s.sok):''}</div>
  ${s.cls?`<div style="font-size:10px;color:var(--muted2);">${escHtml(s.cls)}</div>`:''}
  </div>
  </div>
@@ -11023,7 +10991,7 @@ function openDriverSheet(driverId){
  <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;">
  <div style="width:32px;height:32px;border-radius:50%;background:${r.color}22;color:${r.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">${s.name.charAt(0)}</div>
  <div style="flex:1;min-width:0;">
- <div style="font-size:12px;font-weight:600;">${s.name}</div>
+ <div style="font-size:12px;font-weight:600;">${escHtml(s.name)}</div>
  <div style="font-size:10px;color:var(--muted2);">${s.mah||''}</div>
  </div>
  ${s.ph?`<a href="tel:${s.ph}" style="padding:5px 10px;border-radius:6px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:600;text-decoration:none;">Ara</a>`:'<span style="font-size:10px;color:var(--muted2);">Tel yok</span>'}
@@ -11065,7 +11033,7 @@ function printDriverSheet(){
  const time = leg ? leg.pickupTime||'–' : '–';
  studentRows += `
  <tr>
- <td style="padding:8px 10px;font-weight:700;font-size:13px;">${i+1}. ${s.name}</td>
+ <td style="padding:8px 10px;font-weight:700;font-size:13px;">${i+1}. ${escHtml(s.name)}</td>
  <td style="padding:8px 10px;font-size:11px;color:#555;">${s.ilce||''} / ${s.mah||''}${s.sok?' · '+s.sok:''}</td>
  <td style="padding:8px 10px;font-size:12px;">${s.ph||'–'}</td>
  <td style="padding:8px 10px;font-size:12px;font-weight:700;color:var(--green);text-align:center;">${time}</td>
@@ -11698,7 +11666,7 @@ function renderRemModal(filterQ=''){
    </span>
    <div style="width:20px;height:20px;border-radius:50%;background:var(--brand-glow);border:1px solid rgba(200,55,26,.3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--brand);flex-shrink:0;">${idx+1}</div>
    <div style="flex:1;min-width:0;">
-     <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
+     <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div>
      <div style="font-size:10px;color:var(--muted2);">${s.ilce||''} / ${s.mah||''}</div>
    </div>
    <button onclick="remRemoveStudent(${s.id})" title="Rotadan çıkar"
@@ -11716,7 +11684,7 @@ function renderRemModal(filterQ=''){
  outEl.innerHTML = candidates.length ? candidates.map(s=>`
  <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
  <div style="flex:1;min-width:0;">
- <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
+ <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div>
  <div style="font-size:10px;color:var(--muted2);">${s.ilce||''} / ${s.mah||''}</div>
  </div>
  <button onclick="remAddStudent(${s.id})" title="Rotaya ekle"
@@ -11944,7 +11912,7 @@ function filterUcretAddList(q){
  el.innerHTML = candidates.map(s=>`
  <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:6px;">
  <div style="flex:1;min-width:0;">
-   <div style="font-size:13px;font-weight:600;color:var(--text);">${s.name}</div>
+   <div style="font-size:13px;font-weight:600;color:var(--text);">${escHtml(s.name)}</div>
    <div style="font-size:11px;color:var(--muted2);">${(SCHOOLS[s.school]||SCHOOLS[0]).short||''} · ${s.ilce||''} / ${s.mah||''}</div>
  </div>
  <button onclick="ucretManualAdd(${s.id})"
@@ -12835,7 +12803,7 @@ function openImportSoforModal(){
   document.getElementById('sofor-import-modal').classList.add('open');
 }
 
-function saveImportSofor(){
+async function saveImportSofor(){
   const el = document.getElementById('sim-list');
   if(!el || !el.dataset.candidateIds) {
     toast('⚠️ Listeyi kapatıp tekrar açın', 'error');
@@ -12906,7 +12874,7 @@ function saveImportSofor(){
   });
 
   if(!added){ toast('Hiçbir şoför eklenemedi', 'info'); return; }
-  _saveCariToStorage();
+  await _saveCariToStorage();
   document.getElementById('sofor-import-modal').classList.remove('open');
   toast(`✅ ${added} şoför Cari Hesaplara eklendi`, 'success');
   renderCariListe();
@@ -14104,12 +14072,15 @@ function _newCariId(){ return 'c_' + Date.now() + '_' + Math.random().toString(3
 function _newHareketId(){ return 'h_' + Date.now() + '_' + Math.random().toString(36).substr(2,5); }
 
 function _cariCalcBakiye(cari){
-  let borc=0, alacak=0;
+  let borcKurus=0, alacakKurus=0;
+  // Kuruş bazında (tamsayı) topla, floating-point birikim hatalarını önler
   Object.values(cari.hareketler||{}).forEach(h=>{
-    borc += parseFloat(h.borc||0);
-    alacak += parseFloat(h.alacak||0);
+    borcKurus += Math.round(parseFloat(h.borc||0) * 100);
+    alacakKurus += Math.round(parseFloat(h.alacak||0) * 100);
   });
-  return { borc, alacak, bakiye: borc - alacak };
+  const borc = borcKurus / 100;
+  const alacak = alacakKurus / 100;
+  return { borc, alacak, bakiye: Math.round((borcKurus - alacakKurus)) / 100 };
 }
 
 function _fmtPara(n){
@@ -14997,7 +14968,7 @@ function _trashRender() {
   }).join('');
 }
 
-function _trashRestore(idx) {
+async function _trashRestore(idx) {
   const item = window._trash[idx];
   if (!item) return;
   let msg = '';
@@ -15005,7 +14976,7 @@ function _trashRestore(idx) {
     if (item.type === 'cari') {
       if (!_cariData) return;
       _cariData[item.id] = item.data;
-      _saveCariToStorage();
+      await _saveCariToStorage();
       msg = '"' + item.label + '" cari hesabı geri alındı';
       if (typeof renderCariListe === 'function') renderCariListe();
     } else if (item.type === 'hareket') {
@@ -15014,7 +14985,7 @@ function _trashRestore(idx) {
       if (!_cariData[cariId].hareketler) _cariData[cariId].hareketler = {};
       const {_cariId, ...hData} = item.data;
       _cariData[cariId].hareketler[item.id] = hData;
-      _saveCariToStorage();
+      await _saveCariToStorage();
       msg = 'Hareket geri alındı';
       if (typeof renderCariDetay === 'function') renderCariDetay(cariId);
     } else if (item.type === 'student') {
@@ -15226,7 +15197,7 @@ function _cariGetOkulYovmiye(){
 
 
 // Taşeron aylık hesapla ve cari hareketlerine ekle
-function taseronAylikHesapla(){
+async function taseronAylikHesapla(){
   const gunEl = document.getElementById('taseron-gun-input');
   const ayEl  = document.getElementById('taseron-ay-input');
   const gun   = parseInt(gunEl?.value||0)||0;
@@ -15277,7 +15248,7 @@ function taseronAylikHesapla(){
       };
       eklenen++;
     });
-    _saveCariToStorage();
+    await _saveCariToStorage();
     showToast('✅ ' + eklenen + ' taşeron için ' + ay.replace('-','/') + ' ayı kaydedildi (' + gun + ' gün)', 'success');
     renderCariListe();
   }
@@ -15375,7 +15346,7 @@ function _etgPreview(){
   prev.textContent = g>0 ? g+' gün × '+yov.toLocaleString('tr-TR')+'₺ = '+_fmtPara(g*yov) : '';
 }
 
-function _etgKaydet(){
+async function _etgKaydet(){
   const gunInp = document.getElementById('etg-gun');
   if(!gunInp||!window._etgState) return;
   const gun = parseInt(gunInp.value)||0;
@@ -15393,7 +15364,7 @@ function _etgKaydet(){
     gunKey,
     otomatik: true
   };
-  _saveCariToStorage();
+  await _saveCariToStorage();
   _etgKapat();
   renderCariDetay(cariId);
   showToast('Gün güncellendi: ' + gun + ' gün = ' + _fmtPara(toplam), 'success');
@@ -15685,7 +15656,7 @@ td{border-bottom:1px solid #f0f0f0;}
 }
 
 
-function importCariFromExcel(event){
+async function importCariFromExcel(event){
   const file = event.target.files[0];
   if(!file) return;
   event.target.value = '';
@@ -15849,7 +15820,7 @@ function importCariFromExcel(event){
         added++;
       });
 
-      _saveCariToStorage();
+      await _saveCariToStorage();
       renderCariListe();
       var msg='✅ '+added+' hesap aktarıldı';
       if(skipped>0) msg+=', '+skipped+' sayfa atlandı';
@@ -15904,7 +15875,7 @@ function toggleCdetMenu(){
   }
 }
 
-function clearCariHareketler(){
+async function clearCariHareketler(){
   const id = window._activeCariId;
   if(!id || !_cariData[id]) return;
   const c = _cariData[id];
@@ -15917,7 +15888,7 @@ function clearCariHareketler(){
     _trashAdd('hareket', hid, {...h, _cariId: id});
   });
   _cariData[id].hareketler = {};
-  _saveCariToStorage();
+  await _saveCariToStorage();
   renderCariDetay(id);
   toast('✅ '+count+' hareket silindi. Son Silinenlerden geri alabilirsiniz.','success');
 }
@@ -16127,7 +16098,7 @@ function dokumExcel(){
 function _veliSyncPending(){
   // localStorage'daki pending veli başvurularını Firebase'e yaz
   try{
-    var pending = JSON.parse(localStorage.getItem('veli_pending_v1')||'[]');
+    var pending = _safeParseLS('veli_pending_v1', []);
     if(!pending.length) return;
     if(!window._fbDb || !window._fbRef || !window._fbSet) return;
     pending.forEach(function(v){
@@ -16248,7 +16219,7 @@ function veliBasvuruOnayla(key){
   }).catch(function(e){ if(typeof toast==='function') toast('Hata: '+e.message,'error'); });
 }
 // ── Kasa Cari Excel Import ─────────────────────────────────
-function importKasaFromExcel(event){
+async function importKasaFromExcel(event){
   const file = event.target.files[0];
   if(!file) return;
   event.target.value = '';
@@ -16327,7 +16298,7 @@ function importKasaFromExcel(event){
           hid++; added++;
         }
 
-        _saveCariToStorage();
+        await _saveCariToStorage();
         renderCariDetay(kasaId);
         toast('✅ '+added+' hareket aktarıldı','success');
       }catch(err){
