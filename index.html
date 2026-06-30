@@ -1640,7 +1640,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-10</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-11</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -14087,15 +14087,17 @@ function loadCariData(){
   }catch(e){}
 }
 
-function _saveCariToStorage(){
+async function _saveCariToStorage(){
   try{ localStorage.setItem(_cariLsKey(), JSON.stringify(_cariData)); }catch(e){}
   try{
     if(window._fbDb && window._fbRef && window._fbSet){
       // Cari verisi okul bağımsız - sabit 'GLOBAL' yolu kullan
       const dbRef = window._fbRef(window._fbDb, 'konseltur/GLOBAL/cari');
-      window._fbSet(dbRef, _cariData).catch(e=>console.warn('Cari FB kayıt hatası:', e));
+      // Firebase'e yazmanın TAMAMLANMASINI bekle — erken sayfa yenilemesinde
+      // eski Firebase verisinin yeni kaydı ezmesini önler
+      await window._fbSet(dbRef, _cariData);
     }
-  }catch(e){}
+  }catch(e){ console.warn('Cari FB kayıt hatası:', e); }
 }
 
 function _newCariId(){ return 'c_' + Date.now() + '_' + Math.random().toString(36).substr(2,5); }
@@ -14637,7 +14639,7 @@ function openCariEditModal(id){
   if(c.tur==='basvuru') _cariSetBasvuruFields(c.basvuru||{});
   document.getElementById('cari-add-modal').classList.add('open');
 }
-function saveCariModal(){
+async function saveCariModal(){
   const isim=(document.getElementById('cm-isim').value||'').trim();
   if(!isim){ showToast('Cari ismi zorunludur','error'); return; }
   const editId=document.getElementById('cari-edit-id').value;
@@ -14673,7 +14675,7 @@ function saveCariModal(){
   } else {
     _cariData[id].basvuru = null;
   }
-  _saveCariToStorage();
+  await _saveCariToStorage();
   document.getElementById('cari-add-modal').classList.remove('open');
   showToast(editId?'Cari güncellendi':'Yeni cari eklendi','success');
   if(_currentPage==='cari-liste') renderCariListe();
@@ -14727,7 +14729,7 @@ function _setChTip(tip,btn){
   btn.style.opacity='1';btn.style.transform='scale(1.04)';
   document.getElementById('ch-tip').value=tip;
 }
-function saveCariHareket(){
+async function saveCariHareket(){
   const id=window._activeCariId;
   if(!id||!_cariData[id]) return;
   const tutar=parseFloat(document.getElementById('ch-tutar').value)||0;
@@ -14766,7 +14768,7 @@ function saveCariHareket(){
     _cariData[id].hareketler[hid]._karsiCariId = karsiId;
     _cariData[id].hareketler[hid]._karsiHareketId = karsiHid;
   }
-  _saveCariToStorage();
+  await _saveCariToStorage();
   document.getElementById('cari-hareket-modal').classList.remove('open');
   showToast((tip==='borc'?'Alınan':'Verilen')+' kaydedildi: '+_fmtPara(tutar),'success');
   renderCariDetay(id);
@@ -14778,11 +14780,11 @@ function deleteCariHareket(cariId,hareketId){
   _setText('confirm-msg','Bu hareket kalıcı olarak silinecek. Emin misiniz?');
   const okBtn=document.getElementById('confirm-ok-btn');
   okBtn.textContent='Evet, Sil';
-  okBtn.onclick=function(){
+  okBtn.onclick=async function(){
     const _hObj = _cariData[cariId]?.hareketler?.[hareketId];
     if(_hObj) _trashAdd('hareket', hareketId, {..._hObj, _cariId: cariId});
     delete _cariData[cariId].hareketler[hareketId];
-    _saveCariToStorage();
+    await _saveCariToStorage();
     cm.style.display='none';
     showToast('Hareket silindi','success');
     renderCariDetay(cariId);
@@ -15115,10 +15117,10 @@ function deleteCari(id){
   _setText('confirm-msg','"'+(_cariData[id].isim||'')+'" cari hesabı ve tüm hareketleri silinecek. Son Silinenlerden geri alabilirsiniz.');
   const okBtn=document.getElementById('confirm-ok-btn');
   okBtn.textContent='Evet, Sil';
-  okBtn.onclick=function(){
+  okBtn.onclick=async function(){
     _trashAdd('cari', id, _cariData[id]);
     delete _cariData[id];
-    _saveCariToStorage();
+    await _saveCariToStorage();
     cm.style.display='none';
     showToast('Cari hesap silindi. <b>Geri Al</b> için Son Silinenlerden geri alabilirsiniz.','success');
     gotoC('cari-liste');
@@ -15483,7 +15485,7 @@ function editCariHareket(cariId, hareketId){
   document.body.appendChild(mDiv);
   tutarInput.select();
 }
-function _echKaydet(){
+async function _echKaydet(){
   if(!window._echState) return;
   const { cariId, hareketId } = window._echState;
   const tarih     = (document.getElementById('ech-tarih')?.value||'').trim();
@@ -15564,7 +15566,7 @@ function _echKaydet(){
     });
   }
 
-  _saveCariToStorage();
+  await _saveCariToStorage();
   _echKapat();
   renderCariDetay(cariId);
   showToast('Hareket güncellendi','success');
