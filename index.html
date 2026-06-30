@@ -1590,7 +1590,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-14</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-15</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -15662,7 +15662,7 @@ async function importCariFromExcel(event){
   event.target.value = '';
 
   const reader = new FileReader();
-  reader.onload = function(e){
+  reader.onload = async function(e){
     try{
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, {type:'array', cellDates:false, cellText:false});
@@ -16223,9 +16223,9 @@ async function importKasaFromExcel(event){
   const file = event.target.files[0];
   if(!file) return;
   event.target.value = '';
-  _ensureXLSX(function(){
+  _ensureXLSX(async function(){
     const reader = new FileReader();
-    reader.onload = function(e){
+    reader.onload = async function(e){
       try{
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, {type:'array', cellDates:false, cellText:false});
