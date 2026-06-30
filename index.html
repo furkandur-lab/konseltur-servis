@@ -1590,7 +1590,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-13</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-14</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -15224,7 +15224,7 @@ async function taseronAylikHesapla(){
     return Object.values(har).some(h=>h && h.gunKey===hareketKey);
   }).length;
 
-  function doConfirm(){
+  async function doConfirm(){
     let eklenen = 0;
     _taseronlar.forEach(([id,c])=>{
       const yov    = parseFloat(c.yovmiye||0);
