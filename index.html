@@ -1590,7 +1590,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-15</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-16</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -4862,7 +4862,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
  }
 });
 
-function saveNewSchool(){
+async function saveNewSchool(){
  const name = (document.getElementById('asc-name')?.value||'').trim();
  const short = (document.getElementById('asc-short')?.value||'').trim();
  const ilce = (document.getElementById('asc-ilce')?.value||'').trim();
@@ -4943,18 +4943,18 @@ function saveNewSchool(){
  }, 50);
 
  // SCHOOLS array'ini kalıcı kaydet
- _saveSchoolsToStorage();
+ await _saveSchoolsToStorage();
  toast(isEdit ? '✅ Okul güncellendi' : '✅ Yeni okul eklendi', 'success');
 }
 
-function _saveSchoolsToStorage(){
+async function _saveSchoolsToStorage(){
   try{
     // Sadece ek okulları (index 3+) kaydet — ilk 3 hardcoded
     const extras = SCHOOLS.slice(3);
     localStorage.setItem('konseltur_extra_schools_v1', JSON.stringify(extras));
-    // Firebase'e de yaz
+    // Firebase'e de yaz — tamamlanmasını bekle (race condition önleme)
     if(window._fbDb && window._fbSet && window._fbRef){
-      window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/extra_schools'), extras).catch(()=>{});
+      await window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/extra_schools'), extras);
     }
   }catch(e){ console.error('Okul kaydedilemedi:',e); }
 }
@@ -5100,7 +5100,7 @@ function closeDeleteSchoolModal(){
  window._deleteSchoolIdx = -1;
 }
 
-function _doDeleteSchool(idx, key){
+async function _doDeleteSchool(idx, key){
  // Önce localStorage'dan veriyi temizle (yoksa aynı key'le yeni okul eklenirse eski veri görünür)
  try {
  localStorage.removeItem('konseltur_main_v2_' + key);
@@ -5117,7 +5117,7 @@ function _doDeleteSchool(idx, key){
  SC.splice(idx, 1);
  _refreshSchoolMaps();
  renderLoginSchoolCards();
- _saveSchoolsToStorage();
+ await _saveSchoolsToStorage();
 }
 
 function _refreshSchoolMaps(){
