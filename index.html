@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="202607092245">
+<meta name="app-version" content="202607092310">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.09-20</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.09-21</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -4533,6 +4533,25 @@ function getSchoolIdx(key){ return SCHOOLS.findIndex(s=>s.key===key); }
 function getSchoolByKey(key){ return SCHOOLS.find(s=>s.key===key)||SCHOOLS[0]; }
 // Tüm okul key'lerini döndürür — yedekleme ve döngüler için
 function getAllSchoolKeys(){ return SCHOOLS.map(s=>s.key); }
+// ============================================================
+// OKUL INDEX ONARIMI — Kendini onaran veri bütünlüğü koruması
+// Her öğrenci/rota kaydı .school alanında SCHOOLS dizisindeki index'i saklar.
+// Bir varsayılan okul silindiğinde (bkz. _doDeleteSchool) dizideki sonraki
+// okulların index'i kayar; bu da eski kayıtlardaki .school değerini geçersiz
+// kılar (yanlış okula işaret eder → SCHOOLS[s.school] undefined/yanlış okul
+// döner, "Cannot read properties of undefined (reading 'lat')" hatasına yol açar).
+// Bu fonksiyon, aktif okulun VERİSİ zaten okul-key'ine göre ayrı depolandığı
+// için (konseltur_main_v2_<key>), yüklenen tüm kayıtların .school alanını
+// aktif okulun GÜNCEL index'iyle senkronize eder.
+// ============================================================
+function _normalizeSchoolIndices(){
+ const correctIdx = getSchoolIdx(_activeSchoolKey);
+ if(correctIdx < 0) return; // aktif okul bulunamadı — dokunma
+ let fixed = 0;
+ (students||[]).forEach(s=>{ if(s && s.school !== correctIdx){ s.school = correctIdx; fixed++; } });
+ (routes||[]).forEach(r=>{ if(r && r.school !== correctIdx){ r.school = correctIdx; fixed++; } });
+ if(fixed) console.warn('Okul index onarımı: '+fixed+' kayıt düzeltildi ('+_activeSchoolKey+' → index '+correctIdx+')');
+}
 // --- XSS Koruma: Kullanıcı girdilerini guvenli HTML'e cevir ---
 function escHtml(str){
  if(str===null||str===undefined) return '';
@@ -6555,6 +6574,7 @@ function loadData(){
  routes = Array.isArray(d.routes) ? d.routes : [];
  nSid = Number(d.nSid) || students.length + 1;
  nDid = Number(d.nDid) || drivers.length + 1;
+ _normalizeSchoolIndices();
  }
  }
  } catch(e){ console.warn('loadData localStorage hatası:', e); }
@@ -6605,6 +6625,7 @@ function _loadFromFirebase(){
  const fbNDid = Number(d.nDid) || 1;
  nSid = Math.max(nSid, fbNSid, students.length + 1);
  nDid = Math.max(nDid, fbNDid, drivers.length  + 1);
+ _normalizeSchoolIndices();
  // LocalStorage'ı güncelle
  try{ localStorage.setItem(LS_MAIN(), JSON.stringify({students,drivers,routes,nSid,nDid})); }catch(e){}
  updateAll();
