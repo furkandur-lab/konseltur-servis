@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="202607091021">
+<meta name="app-version" content="202607092245">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -614,12 +614,12 @@ body.light .field select{
 }
 .map-toggle{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted2);font-size:11px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:all var(--t-fast);min-height:32px;}
 .map-toggle.active{background:rgba(200,55,26,.12);border-color:rgba(200,55,26,.4);color:var(--brand);}
-/* Leaflet dark overrides */
-.leaflet-tile-pane{filter:brightness(.85) saturate(.7) hue-rotate(180deg) invert(1);}
-.leaflet-container{font-family:'Outfit',sans-serif!important;}
-.leaflet-popup-content-wrapper{background:var(--card)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 32px rgba(0,0,0,.4)!important;color:var(--text)!important;}
-.leaflet-popup-tip{background:var(--card)!important;}
-.leaflet-popup-content{margin:10px 14px!important;font-size:12px!important;line-height:1.6!important;}
+/* Google Maps InfoWindow dark tema override */
+.gm-style .gm-style-iw-c{background:var(--card)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 32px rgba(0,0,0,.4)!important;padding:12px!important;}
+.gm-style .gm-style-iw-d{overflow:auto!important;color:var(--text)!important;font-family:'Outfit',sans-serif!important;font-size:12px!important;line-height:1.6!important;}
+.gm-style .gm-style-iw-t::after{background:linear-gradient(45deg,var(--card) 50%,rgba(0,0,0,0) 51%,rgba(0,0,0,0) 100%)!important;}
+.gm-style .gm-style-iw-tc::after{background:var(--card)!important;}
+.gm-ui-hover-effect{filter:invert(1);opacity:.6;}
 .lf-route-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:4px;}
 /* Şoför Mobil Yazdır */
 @media print{
@@ -1013,7 +1013,6 @@ body.light .nav-tab.active{background:#f5f6f8;color:#111827;border-color:#d0d4db
 body.light .nav-tab.active::after{opacity:.5;}
 body.light .nav-pill-count{background:rgba(200,55,26,.08);border-color:rgba(200,55,26,.15);}
 body.light .save-dot{background:rgba(34,197,94,.6);}
-body.light .leaflet-tile-pane{filter:none;}
 body.light #leaflet-map{background:#e8eaed;}
 body.light .ay-bar-wrap{background:#fff;border-color:#e2e5ea;}
 body.light .ay-bar-track{background:#e2e5ea;}
@@ -1471,8 +1470,6 @@ body.light .pay-row:hover { background:rgba(0,0,0,.025); }
 }
 /* end print */
 </style>
-<!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <!-- Firebase SDK -->
 <script type="module">
  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1590,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.09-18</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.09-20</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -4150,8 +4147,7 @@ setInterval(updateLoginClock, 30000);
  </div>
 </div>
 
-<!-- Leaflet JS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- Google Maps JS API artık dinamik olarak _ensureGoogleMaps() ile yükleniyor (bkz. GOOGLE_MAPS_API_KEY) -->
 <script>
 
 
@@ -6718,58 +6714,84 @@ function flashSaveDot(){
 // UYGULAMA GEÇİŞİ
 // 
 // ============================================================
-// LOCATIONİQ GEOCODİNG API — Kendi API anahtarınızı buraya girin
-// Ücretsiz hesap: https://locationiq.com/register
+// GOOGLE MAPS API — Kendi API anahtarınızı buraya girin
+// Nasıl alınır: https://developers.google.com/maps/documentation/javascript/get-api-key
+// Google Cloud Console'da "Maps JavaScript API" ve "Geocoding API"yi etkinleştirmeyi
+// ve anahtarı HTTP referrer (siteniz) ile kısıtlamayı unutmayın.
+// NOT: Google faturalandırma (kredi kartlı) hesap gerektirir; aylık ücretsiz kota
+// dolduktan sonra kullanım başına ücretlendirilir.
 // ============================================================
-const LOCATIONIQ_API_KEY = 'pk.164d79136cc050adb7ff3f05ef87502f';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyD1M6OgOBI0khHvKW0_YU7ceAQSg1jt724';
 
 // Konya Merkez İlçe Sınırı (Karatay, Meram, Selçuklu)
 const KONYA_SW = [37.65, 32.25]; // Güneybatı (genişletilmiş)
 const KONYA_NE = [38.15, 32.75]; // Kuzeydoğu (genişletilmiş)
-// LocationIQ viewbox: minLng,minLat,maxLng,maxLat formatında
-const LOCATIONIQ_VIEWBOX = '32.25,37.65,32.75,38.15';
+
+// ============================================================
+// GOOGLE MAPS JS API — tek seferlik dinamik yükleme
+// Hem harita (initMap) hem geocoding (geocodeAddress) bu fonksiyonu kullanır
+// ============================================================
+let _gmapsLoadPromise = null;
+function _ensureGoogleMaps(){
+ if(window.google && window.google.maps) return Promise.resolve();
+ if(_gmapsLoadPromise) return _gmapsLoadPromise;
+ if(!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY === 'BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN'){
+  return Promise.reject(new Error('GOOGLE_MAPS_API_KEY tanımlı değil'));
+ }
+ _gmapsLoadPromise = new Promise((resolve, reject)=>{
+  const cbName = '_gmapsReady_' + Date.now();
+  window[cbName] = ()=>{ delete window[cbName]; resolve(); };
+  const script = document.createElement('script');
+  script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(GOOGLE_MAPS_API_KEY)
+   + '&v=weekly&language=tr&region=TR&loading=async&callback=' + cbName;
+  script.async = true;
+  script.onerror = ()=>{ _gmapsLoadPromise = null; reject(new Error('Google Maps yüklenemedi')); };
+  document.head.appendChild(script);
+ });
+ return _gmapsLoadPromise;
+}
 
 // ============================================================
 // GEOCODİNG — Adresden gerçek koordinat al (kapı numarası seviyesi)
-// Önce LocationIQ dener; API key yoksa veya hata olursa MAHALLES fallback
+// Google Geocoding API (google.maps.Geocoder) kullanır; anahtar yoksa/hata olursa MAHALLES fallback
 // ============================================================
 const _geocodeCache = {};
 async function geocodeAddress(fullAddr, ilce, mah){
  const cacheKey = fullAddr.trim().toLowerCase();
  if(_geocodeCache[cacheKey]) return _geocodeCache[cacheKey];
 
- if(LOCATIONIQ_API_KEY && LOCATIONIQ_API_KEY !== 'BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN'){
+ if(GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN'){
   try{
-   const query = encodeURIComponent((ilce ? ilce+' İlçesi, ' : '') + fullAddr + ', Konya, Türkiye');
-   const url = 'https://us1.locationiq.com/v1/search?key='+LOCATIONIQ_API_KEY
-    +'&q='+query
-    +'&format=json&limit=1&countrycodes=tr'
-    +'&viewbox='+LOCATIONIQ_VIEWBOX+'&bounded=0';
-   const res = await fetch(url);
-   if(res.ok){
-    const data = await res.json();
-    if(data && data[0]){
-     const coord = {lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), source:'locationiq'};
-     // Konya sınırı içinde mi kontrol et
-     if(coord.lat>=KONYA_SW[0]&&coord.lat<=KONYA_NE[0]&&coord.lng>=KONYA_SW[1]&&coord.lng<=KONYA_NE[1]){
-      // Sağlamlık kontrolü: bilinen mahalle merkezinden çok uzaksa (>4km) güvenilmez say
-      if(ilce && mah){
-       const mahCenter = getCoord(ilce, mah);
-       if(mahCenter && mahCenter.lat){
-        const dLat = coord.lat - mahCenter.lat, dLng = coord.lng - mahCenter.lng;
-        const distKm = Math.sqrt(dLat*dLat + dLng*dLng) * 111; // yaklaşık km
-        if(distKm > 4){
-         console.warn('Geocode sonucu mahalle merkezinden çok uzak ('+distKm.toFixed(1)+'km), reddedildi:', fullAddr);
-         return null;
-        }
+   await _ensureGoogleMaps();
+   const geocoder = new google.maps.Geocoder();
+   const query = (ilce ? ilce+' İlçesi, ' : '') + fullAddr + ', Konya, Türkiye';
+   const bounds = new google.maps.LatLngBounds(
+    {lat:KONYA_SW[0], lng:KONYA_SW[1]},
+    {lat:KONYA_NE[0], lng:KONYA_NE[1]}
+   );
+   const res = await geocoder.geocode({ address: query, bounds, region: 'tr' });
+   if(res && res.results && res.results[0]){
+    const loc = res.results[0].geometry.location;
+    const coord = {lat: loc.lat(), lng: loc.lng(), source:'google'};
+    // Konya sınırı içinde mi kontrol et
+    if(coord.lat>=KONYA_SW[0]&&coord.lat<=KONYA_NE[0]&&coord.lng>=KONYA_SW[1]&&coord.lng<=KONYA_NE[1]){
+     // Sağlamlık kontrolü: bilinen mahalle merkezinden çok uzaksa (>4km) güvenilmez say
+     if(ilce && mah){
+      const mahCenter = getCoord(ilce, mah);
+      if(mahCenter && mahCenter.lat){
+       const dLat = coord.lat - mahCenter.lat, dLng = coord.lng - mahCenter.lng;
+       const distKm = Math.sqrt(dLat*dLat + dLng*dLng) * 111; // yaklaşık km
+       if(distKm > 4){
+        console.warn('Geocode sonucu mahalle merkezinden çok uzak ('+distKm.toFixed(1)+'km), reddedildi:', fullAddr);
+        return null;
        }
       }
-      _geocodeCache[cacheKey] = coord;
-      return coord;
      }
+     _geocodeCache[cacheKey] = coord;
+     return coord;
     }
    }
-  }catch(e){ console.warn('LocationIQ geocode hatası:', e); }
+  }catch(e){ console.warn('Google geocode hatası:', e); }
  }
  // Fallback: MAHALLES veritabanından mahalle merkez koordinatı
  return null; // null dönerse mevcut getCoord() kullanılır
@@ -6777,7 +6799,7 @@ async function geocodeAddress(fullAddr, ilce, mah){
 
 // Toplu geocoding — öğrenci importu veya "Koordinatları Yenile" sırasında
 async function geocodeBatch(studentList){
- if(!LOCATIONIQ_API_KEY || LOCATIONIQ_API_KEY==='BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN') return {updated:0, apiOk:0, apiFailed:0, apiPartial:0};
+ if(!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY==='BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN') return {updated:0, apiOk:0, apiFailed:0, apiPartial:0};
  let updated=0, apiOk=0, apiFailed=0, apiPartial=0;
  for(const s of studentList){
   if(!s.name) continue;
@@ -6788,14 +6810,14 @@ async function geocodeBatch(studentList){
   if(s.fullAddrOrig && s.fullAddrOrig.trim()){
    try{ coord = await geocodeAddress(s.fullAddrOrig.trim(), s.ilce, s.mah); }
    catch(e){ console.warn('geocodeBatch (orijinal adres) hata ('+s.name+'):', e); }
-   await new Promise(resolve=>setTimeout(resolve, 1100));
+   await new Promise(resolve=>setTimeout(resolve, 200));
   }
   // 2. Bulunamadıysa ayrıştırılmış adresle dene
   if(!coord){
    const fullAddr = [s.sok, (s.no && s.no!=='–' ? 'No:'+s.no : ''), s.mah, s.ilce, 'Konya'].filter(Boolean).join(', ');
    try{ coord = await geocodeAddress(fullAddr, s.ilce, s.mah); }
    catch(e){ console.warn('geocodeBatch hata ('+s.name+'):', e); }
-   await new Promise(resolve=>setTimeout(resolve, 1100));
+   await new Promise(resolve=>setTimeout(resolve, 200));
   }
   // 3. Hâlâ bulunamadıysa sade sokak adı + mahalle ile dene (site/apartman/blok adlarını at)
   if(!coord && s.sok){
@@ -6804,7 +6826,7 @@ async function geocodeBatch(studentList){
     const fullAddr2 = [sokSade, s.mah, s.ilce, 'Konya'].filter(Boolean).join(', ');
     try{ coord = await geocodeAddress(fullAddr2, s.ilce, s.mah); }
     catch(e){ console.warn('geocodeBatch (sade sokak) hata ('+s.name+'):', e); }
-    await new Promise(resolve=>setTimeout(resolve, 1100));
+    await new Promise(resolve=>setTimeout(resolve, 200));
    }
   }
   // 4. Son çare: sadece mahalle + ilçe ile dene (en azından mahalle hassasiyetinde gerçek nokta al)
@@ -6835,8 +6857,8 @@ async function geocodeBatch(studentList){
     }
    }
   }
-  // LocationIQ rate limit: ücretsiz hesapta saniyede 1 istek
-  await new Promise(resolve=>setTimeout(resolve, 1100));
+  // Google Geocoding rate limit: ihtiyatlı gecikme
+  await new Promise(resolve=>setTimeout(resolve, 200));
  }
  return {updated, apiOk, apiFailed, apiPartial};
 }
@@ -7017,9 +7039,9 @@ function _gotoNoHistory(p){
  if(p==='map'){
  setTimeout(()=>{
  initMap();
- if(_map){ _map.invalidateSize(); renderMapLayers(); mapFitAll(); }
- // Mobil için ekstra invalidateSize — layout yerleştikten sonra
- setTimeout(()=>{ if(_map) _map.invalidateSize(); }, 400);
+ if(_map){ google.maps.event.trigger(_map, 'resize'); renderMapLayers(); mapFitAll(); }
+ // Mobil için ekstra resize tetikleme — layout yerleştikten sonra
+ setTimeout(()=>{ if(_map) google.maps.event.trigger(_map, 'resize'); }, 400);
  }, 150);
  }
 }
@@ -7192,8 +7214,8 @@ function addStudent(){
  document.getElementById('s-mahalle').innerHTML='<option value="">-- Önce İlçe --</option>';
  document.getElementById('s-sokak').innerHTML='<option value="">-- Önce Mahalle --</option>';
  updateAll(); saveData(); toast('✅ '+name+' eklendi');
- // Arka planda gerçek koordinat al (LocationIQ varsa)
- if(LOCATIONIQ_API_KEY && LOCATIONIQ_API_KEY !== 'BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN'){
+ // Arka planda gerçek koordinat al (Google Maps varsa)
+ if(GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN'){
   const fullAddr = [sok, (no && no!=='–' ? 'No:'+no : ''), mah, ilce, 'Konya'].filter(Boolean).join(', ');
   geocodeAddress(fullAddr, ilce, mah).then(coord=>{
    if(!coord) return;
@@ -9803,7 +9825,7 @@ function importExcel(){
   toast('✅ ' + count + ' öğrenci yüklendi' + (needsGeocode.length ? ' · '+needsGeocode.length+' öğrenci için koordinat aranıyor...' : ''));
 
   // Koordinatı olmayan öğrenciler için arka planda geocoding
-  if(needsGeocode.length && LOCATIONIQ_API_KEY && LOCATIONIQ_API_KEY!=='BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN'){
+  if(needsGeocode.length && GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY!=='BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN'){
    (async()=>{
     let updated=0;
     for(const sid of needsGeocode){
@@ -9914,7 +9936,7 @@ async function saveStudentEdit(){
   routes.forEach(r=>{ const rs=r.students.find(x=>x.id===s.id); if(rs){rs.lat=s.lat;rs.lng=s.lng;} });
   if(typeof renderMapLayers==='function') renderMapLayers();
   saveData();
-  // Sonra LocationIQ ile gerçek koordinat al (varsa)
+  // Sonra Google Maps ile gerçek koordinat al (varsa)
   geocodeAddress(fullAddr, s.ilce, s.mah).then(coord=>{
    if(!coord) return;
    s.lat=coord.lat; s.lng=coord.lng;
@@ -10625,37 +10647,63 @@ function importData(event){
 
 
 let _map = null;
-let _mapLayers = { students: null, drivers: null, schools: null, routes: null };
+let _mapInfoWindow = null; // Tüm popup'lar için paylaşılan tek InfoWindow (Leaflet'teki bindPopup karşılığı)
+let _mapLayers = { students: [], drivers: [], schools: [], routes: [] }; // her biri google.maps nesneleri dizisi
 let _mapVisible = { students: true, drivers: true, schools: true, routes: true };
 let _mapFilter = 'all'; // 'all' veya route id
 
-function initMap(){
+// Google Maps için sade koyu tema stili (eski Leaflet CSS filtresinin karşılığı)
+const _GMAPS_DARK_STYLE = [
+ {elementType:'geometry', stylers:[{color:'#1a1a2e'}]},
+ {elementType:'labels.text.stroke', stylers:[{color:'#1a1a2e'}]},
+ {elementType:'labels.text.fill', stylers:[{color:'#8a8fa3'}]},
+ {featureType:'administrative', elementType:'geometry', stylers:[{color:'#3a3f57'}]},
+ {featureType:'poi', stylers:[{visibility:'off'}]},
+ {featureType:'road', elementType:'geometry', stylers:[{color:'#2a2f47'}]},
+ {featureType:'road', elementType:'geometry.stroke', stylers:[{color:'#1a1a2e'}]},
+ {featureType:'road.highway', elementType:'geometry', stylers:[{color:'#3a3f5c'}]},
+ {featureType:'transit', stylers:[{visibility:'off'}]},
+ {featureType:'water', elementType:'geometry', stylers:[{color:'#0f1420'}]}
+];
+
+async function initMap(){
  if(_map) return;
- // Leaflet yüklü mü kontrol et
- if(typeof L === 'undefined'){
- document.getElementById('leaflet-map').innerHTML =
- '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted2);font-size:13px;flex-direction:column;gap:8px;">' +
- '<div style="font-size:32px;"></div><div>Harita yüklenemedi — internet bağlantısı gerekli</div></div>';
- return;
+ if(!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY === 'BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN'){
+  document.getElementById('leaflet-map').innerHTML =
+  '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted2);font-size:13px;flex-direction:column;gap:8px;text-align:center;padding:20px;">' +
+  '<div style="font-size:32px;"></div><div>Google Maps API anahtarı tanımlı değil<br><span style="font-size:11px;opacity:.7;">GOOGLE_MAPS_API_KEY sabitine kendi anahtarınızı girin</span></div></div>';
+  return;
  }
- const konya = [37.8713, 32.4846];
+ try{
+  await _ensureGoogleMaps();
+ }catch(e){
+  console.warn('Google Maps yüklenemedi:', e);
+  document.getElementById('leaflet-map').innerHTML =
+  '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted2);font-size:13px;flex-direction:column;gap:8px;">' +
+  '<div style="font-size:32px;"></div><div>Harita yüklenemedi — internet bağlantısı gerekli</div></div>';
+  return;
+ }
+ const konya = {lat:37.8713, lng:32.4846};
  // Konya Merkez 3 ilçe sınırı: Karatay, Meram, Selçuklu
- const konyaBounds = L.latLngBounds(
-  L.latLng(KONYA_SW[0], KONYA_SW[1]), // güneybatı [37.65, 32.25]
-  L.latLng(KONYA_NE[0], KONYA_NE[1])  // kuzeydoğu [38.15, 32.75]
+ const konyaBounds = new google.maps.LatLngBounds(
+  {lat:KONYA_SW[0], lng:KONYA_SW[1]}, // güneybatı
+  {lat:KONYA_NE[0], lng:KONYA_NE[1]}  // kuzeydoğu
  );
- _map = L.map('leaflet-map', {
-  zoomControl: true,
-  attributionControl: false,
+ const isLight = document.body.classList.contains('light');
+ _map = new google.maps.Map(document.getElementById('leaflet-map'), {
+  center: konya,
+  zoom: 13,
   minZoom: 11,
   maxZoom: 18,
-  maxBounds: konyaBounds,
-  maxBoundsViscosity: 0.5  // Esnek sınır — uç mahalleler için
- }).setView(konya, 13);
- L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 18, attribution: '© OSM'
- }).addTo(_map);
+  restriction: { latLngBounds: konyaBounds, strictBounds: false }, // Esnek sınır — uç mahalleler için
+  disableDefaultUI: true,
+  zoomControl: true,
+  gestureHandling: 'greedy',
+  styles: isLight ? [] : _GMAPS_DARK_STYLE
+ });
+ _mapInfoWindow = new google.maps.InfoWindow();
  renderMapLayers();
+ mapFitAll();
 }
 
 
@@ -10693,10 +10741,19 @@ function spreadOverlappingMarkers(students){
  return result;
 }
 
+// Leaflet L.divIcon karşılığı — renkli/özel SVG pin üretir, google.maps.Marker icon olarak kullanılır
+function _svgIcon(svg, w, h, anchorX, anchorY){
+ return {
+  url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+  scaledSize: new google.maps.Size(w, h),
+  anchor: new google.maps.Point(anchorX, anchorY)
+ };
+}
+
 function renderMapLayers(){
  if(!_map) return;
  // Eski katmanları temizle
- Object.values(_mapLayers).forEach(l=>{ if(l){ _map.removeLayer(l); } });
+ Object.values(_mapLayers).forEach(arr=>{ (arr||[]).forEach(o=>o.setMap(null)); });
  // Öğrenci arama için marker referans kaydı sıfırla
  window._studentMarkers = {};
 
@@ -10706,29 +10763,30 @@ function renderMapLayers(){
  : routes;
 
  // Rota çizgileri 
- const routeGroup = L.layerGroup();
+ const routeLayer = [];
  activeRoutes.forEach(r=>{
  const sch = SCHOOLS[r.school];
  const pts = [];
  // Şoför ev → öğrenciler → okul
  const drv = r.driverId ? drivers.find(d=>d.id===r.driverId) : null;
- if(drv) pts.push([drv.lat, drv.lng]);
- r.students.forEach(s=>pts.push([s.lat, s.lng]));
- pts.push([sch.lat, sch.lng]);
+ if(drv) pts.push({lat:drv.lat, lng:drv.lng});
+ r.students.forEach(s=>pts.push({lat:s.lat, lng:s.lng}));
+ pts.push({lat:sch.lat, lng:sch.lng});
  if(pts.length >= 2){
- L.polyline(pts, {
- color: r.color, weight: 3, opacity: 0.75,
- dashArray: null
- }).addTo(routeGroup);
- // Ok yönü (polyline decorator yoksa basit ok)
- L.polyline(pts, {color: r.color, weight: 1, opacity: 0.3}).addTo(routeGroup);
+ routeLayer.push(new google.maps.Polyline({
+ path: pts, strokeColor: r.color, strokeWeight: 3, strokeOpacity: 0.75
+ }));
+ // Ok yönü (kalın çizginin altında ince/soluk ikinci çizgi)
+ routeLayer.push(new google.maps.Polyline({
+ path: pts, strokeColor: r.color, strokeWeight: 1, strokeOpacity: 0.3
+ }));
  }
  });
- _mapLayers.routes = routeGroup;
- if(_mapVisible.routes) routeGroup.addTo(_map);
+ _mapLayers.routes = routeLayer;
+ if(_mapVisible.routes) routeLayer.forEach(pl=>pl.setMap(_map));
 
  // Öğrenci pinleri 
- const studGroup = L.layerGroup();
+ const studLayer = [];
  const shownStudents = new Set();
  activeRoutes.forEach(r=>{
  // Üst üste binen öğrencileri dağıt
@@ -10737,11 +10795,7 @@ function renderMapLayers(){
  shownStudents.add(s.id);
  const color = r.color;
  const pos = spreadCoords[idx];
- const icon = L.divIcon({
- className:'',
- html:`<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2.5px solid white;box-shadow:0 2px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#111;font-family:Syne,sans-serif;cursor:grab;">${idx+1}</div>`,
- iconSize:[28,28], iconAnchor:[14,14]
- });
+ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2.5"/><text x="14" y="18" font-family="Arial,sans-serif" font-size="11" font-weight="800" fill="#111" text-anchor="middle">${idx+1}</text></svg>`;
  const pop = `<div><span class="lf-route-badge" style="background:${color}22;color:${color};">${r.label} · Durak ${idx+1}</span><br>
  <strong>${escHtml(s.name)}</strong><br>
  <span style="color:var(--muted2);">${escHtml(s.ilce)} / ${escHtml(s.mah)}</span><br>
@@ -10755,17 +10809,24 @@ function renderMapLayers(){
  </div>
  <span style="font-size:10px;color:var(--muted2);opacity:.7;">📍 Konumu düzeltmek için sürükleyin</span>
  </div>`;
- const mk = L.marker([pos.lat,pos.lng],{icon, draggable:true, riseOnHover:true, riseOffset:1000}).bindPopup(pop).addTo(studGroup);
- window._studentMarkers[s.id] = mk;
- mk.on('dragend', function(ev){
- const newPos = ev.target.getLatLng();
- s.lat = newPos.lat; s.lng = newPos.lng;
+ const mk = new google.maps.Marker({
+ position: {lat:pos.lat, lng:pos.lng},
+ icon: _svgIcon(svg, 28, 28, 14, 14),
+ draggable: true,
+ zIndex: 100
+ });
+ mk.addListener('click', ()=>{ _mapInfoWindow.setContent(pop); _mapInfoWindow.open(_map, mk); });
+ mk.addListener('dragend', function(ev){
+ const newPos = ev.latLng;
+ s.lat = newPos.lat(); s.lng = newPos.lng();
  const orig = students.find(x=>x.id===s.id);
- if(orig){ orig.lat = newPos.lat; orig.lng = newPos.lng; }
+ if(orig){ orig.lat = s.lat; orig.lng = s.lng; }
  saveData();
  toast('📍 '+s.name+' konumu güncellendi');
- ev.target.bindPopup(pop).openPopup();
+ _mapInfoWindow.setContent(pop); _mapInfoWindow.open(_map, mk);
  });
+ window._studentMarkers[s.id] = mk;
+ studLayer.push(mk);
  });
  });
  // Rotasız öğrenciler (gri) — hem optimizasyonun çıkardığı hem hiç atanmamış öğrencileri kapsa
@@ -10775,11 +10836,7 @@ function renderMapLayers(){
  const incompat = students.filter(s => !shownStudents.has(s.id) && s.school===_activeSchIdx);
  incompat.forEach(s=>{
  if(shownStudents.has(s.id)) return;
- const icon = L.divIcon({
- className:'',
- html:`<div style="width:22px;height:22px;border-radius:50%;background:#6b7280;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:10px;cursor:grab;"></div>`,
- iconSize:[22,22],iconAnchor:[11,11]
- });
+ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="9" fill="#6b7280" stroke="white" stroke-width="2"/></svg>`;
  const popG = `<strong>${escHtml(s.name)}</strong><br><span style="color:var(--red)">Servis yok</span><br>
  <span style="color:var(--muted2);">${escHtml(s.ilce||'')} / ${escHtml(s.mah||'')}</span><br>
  ${s.ph?`<span style="color:var(--muted2);">📞 ${escHtml(s.ph)}</span><br>`:''}
@@ -10788,59 +10845,71 @@ function renderMapLayers(){
   <button onclick="startMoveStudent(${s.id}, null)" style="flex:1;padding:5px 8px;border-radius:6px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.15);color:#a5b4fc;font-size:11px;cursor:pointer;font-family:Outfit,sans-serif;">🚌 Servise Ata</button>
  </div>
  <span style="font-size:10px;color:var(--muted2);opacity:.7;">📍 Konumu düzeltmek için sürükleyin</span>`;
- const mkG = L.marker([s.lat,s.lng],{icon, draggable:true, riseOnHover:true, riseOffset:1000}).bindPopup(popG).addTo(studGroup);
- window._studentMarkers[s.id] = mkG;
- mkG.on('dragend', function(ev){
- const newPos = ev.target.getLatLng();
+ const mkG = new google.maps.Marker({
+ position: {lat:s.lat, lng:s.lng},
+ icon: _svgIcon(svg, 22, 22, 11, 11),
+ draggable: true
+ });
+ mkG.addListener('click', ()=>{ _mapInfoWindow.setContent(popG); _mapInfoWindow.open(_map, mkG); });
+ mkG.addListener('dragend', function(ev){
+ const newPos = ev.latLng;
  const orig = students.find(x=>x.id===s.id);
- if(orig){ orig.lat = newPos.lat; orig.lng = newPos.lng; }
+ if(orig){ orig.lat = newPos.lat(); orig.lng = newPos.lng(); }
  saveData();
  toast('📍 '+s.name+' konumu güncellendi');
- ev.target.bindPopup(popG).openPopup();
+ _mapInfoWindow.setContent(popG); _mapInfoWindow.open(_map, mkG);
  });
+ window._studentMarkers[s.id] = mkG;
+ studLayer.push(mkG);
  });
  }
- _mapLayers.students = studGroup;
- if(_mapVisible.students) studGroup.addTo(_map);
+ _mapLayers.students = studLayer;
+ if(_mapVisible.students) studLayer.forEach(mk=>mk.setMap(_map));
 
  // Şoför pinleri 
- const drvGroup = L.layerGroup();
+ const drvLayer = [];
  drivers.forEach(d=>{
  const r = routes.find(x=>x.driverId===d.id);
  if(filterRouteId!==null && (!r||r.id!==filterRouteId)) return;
  const color = r ? r.color : '#9ca3af';
- const icon = L.divIcon({
- className:'',
- html:`<div style="width:30px;height:30px;border-radius:8px;background:${color};border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:15px;"></div>`,
- iconSize:[30,30],iconAnchor:[15,15]
- });
+ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><rect x="1" y="1" width="28" height="28" rx="8" ry="8" fill="${color}" stroke="white" stroke-width="2.5"/></svg>`;
  const pop = `<strong>${escHtml(d.name)}</strong><br>
  ${d.veh?` ${d.veh}<br>`:''}
  ${d.ph?` ${d.ph}<br>`:''}
  ${r?`<span style="color:${r.color};">${r.label}</span>`:'<span style="color:#9ca3af;">Atanmamış</span>'}`;
- L.marker([d.lat,d.lng],{icon}).bindPopup(pop).addTo(drvGroup);
+ const mk = new google.maps.Marker({
+ position: {lat:d.lat, lng:d.lng},
+ icon: _svgIcon(svg, 30, 30, 15, 15)
  });
- _mapLayers.drivers = drvGroup;
- if(_mapVisible.drivers) drvGroup.addTo(_map);
+ mk.addListener('click', ()=>{ _mapInfoWindow.setContent(pop); _mapInfoWindow.open(_map, mk); });
+ drvLayer.push(mk);
+ });
+ _mapLayers.drivers = drvLayer;
+ if(_mapVisible.drivers) drvLayer.forEach(mk=>mk.setMap(_map));
 
  // Okul pinleri 
- const schGroup = L.layerGroup();
+ const schColors = ['#60a5fa','#22c55e','#f59e0b'];
+ const schLayer = [];
  SCHOOLS.forEach((s,i)=>{
- const color = ['#60a5fa','var(--green)','#f59e0b'][i]||'#a78bfa';
- const icon = L.divIcon({
- className:'',
- html:`<div style="padding:4px 8px;border-radius:8px;background:${color};color:#111;font-size:10px;font-weight:800;white-space:nowrap;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);"> ${s.short}</div>`,
- iconSize:[null,null],iconAnchor:[0,10], popupAnchor:[40,0]
- });
+ const color = schColors[i]||'#a78bfa';
+ const label = s.short||'';
+ const w = Math.max(40, label.length*7 + 20);
+ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="24"><rect x="1" y="1" width="${w-2}" height="22" rx="8" ry="8" fill="${color}" stroke="white" stroke-width="2"/><text x="${w/2}" y="16" font-family="Arial,sans-serif" font-size="10" font-weight="800" fill="#111" text-anchor="middle">${escHtml(label)}</text></svg>`;
  const cnt = routes.filter(r=>r.school===i).reduce((a,r)=>a+r.students.length,0);
  const pop = `<strong>${escHtml(s.name)}</strong><br>
  ${s.adres}<br>
  ${cnt} öğrenci · ${routes.filter(r=>r.school===i).length} rota<br>
  ⏰ Giriş: ${s.girisH}:${String(s.girisM).padStart(2,'0')}`;
- L.marker([s.lat,s.lng],{icon}).bindPopup(pop).addTo(schGroup);
+ const mk = new google.maps.Marker({
+ position: {lat:s.lat, lng:s.lng},
+ icon: _svgIcon(svg, w, 24, w/2, 12),
+ zIndex: 200
  });
- _mapLayers.schools = schGroup;
- if(_mapVisible.schools) schGroup.addTo(_map);
+ mk.addListener('click', ()=>{ _mapInfoWindow.setContent(pop); _mapInfoWindow.open(_map, mk); });
+ schLayer.push(mk);
+ });
+ _mapLayers.schools = schLayer;
+ if(_mapVisible.schools) schLayer.forEach(mk=>mk.setMap(_map));
 
  // Filtre dropdown güncelle 
  const sel = document.getElementById('map-route-filter');
@@ -10871,9 +10940,9 @@ function renderMapLayers(){
 function mapToggleLayer(layer, btn){
  _mapVisible[layer] = !_mapVisible[layer];
  btn.classList.toggle('active', _mapVisible[layer]);
- const l = _mapLayers[layer];
- if(!l || !_map) return;
- if(_mapVisible[layer]) l.addTo(_map); else _map.removeLayer(l);
+ const arr = _mapLayers[layer];
+ if(!arr || !_map) return;
+ arr.forEach(o=> o.setMap(_mapVisible[layer] ? _map : null));
 }
 
 function mapFilterChanged(){
@@ -10884,15 +10953,16 @@ function mapFilterChanged(){
 
 function mapFitAll(){
  if(!_map) return;
- const pts = [];
+ const bounds = new google.maps.LatLngBounds();
+ let count = 0;
  const filterRouteId = _mapFilter==='all' ? null : parseInt(_mapFilter);
  const activeRoutes = filterRouteId!==null ? routes.filter(r=>r.id===filterRouteId) : routes;
- activeRoutes.forEach(r=>{ r.students.forEach(s=>pts.push([s.lat,s.lng])); });
- SCHOOLS.forEach(s=>pts.push([s.lat,s.lng]));
- if(pts.length >= 2){
- try{ _map.fitBounds(L.latLngBounds(pts).pad(0.1)); } catch(e){}
+ activeRoutes.forEach(r=>{ r.students.forEach(s=>{ bounds.extend({lat:s.lat,lng:s.lng}); count++; }); });
+ SCHOOLS.forEach(s=>{ bounds.extend({lat:s.lat,lng:s.lng}); count++; });
+ if(count >= 2){
+ try{ _map.fitBounds(bounds, 40); } catch(e){}
  } else {
- _map.setView([37.8713,32.4846],13);
+ _map.setCenter({lat:37.8713,lng:32.4846}); _map.setZoom(13);
  }
 }
 
@@ -10964,10 +11034,11 @@ function mapGoToStudent(studentId){
  document.getElementById('map-student-search').value = s.name;
 
  // Haritayı pin'e odakla ve popup'ı aç
- _map.setView([s.lat, s.lng], 16, {animate:true});
+ _map.panTo({lat:s.lat, lng:s.lng});
+ _map.setZoom(16);
  setTimeout(()=>{
   const mk = window._studentMarkers && window._studentMarkers[studentId];
-  if(mk) mk.openPopup();
+  if(mk) google.maps.event.trigger(mk, 'click');
  }, 350);
 }
 
@@ -11314,18 +11385,18 @@ function checkCoordIssues(){
 
 
 // TÜM ÖĞRENCİ KOORDİNATLARINI YENİDEN HESAPLA (mahalle veritabanına göre)
-// LocationIQ API key varsa gerçek adres koordinatı alır, yoksa mahalle merkezi kullanır
+// Google Maps API key varsa gerçek adres koordinatı alır, yoksa mahalle merkezi kullanır
 async function refreshAllCoords(){
  try{
   _ensureMAHALLES();
   const btn = document.querySelector('[onclick="refreshAllCoords()"]');
   if(btn){ btn.disabled=true; btn.textContent='⏳ Yenileniyor...'; }
 
-  const useAPI = LOCATIONIQ_API_KEY && LOCATIONIQ_API_KEY !== 'BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN';
+  const useAPI = GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'BURAYA_KENDİ_API_ANAHTARINIZI_YAZIN';
   let changed=0, apiOk=0, apiFailed=0, apiPartial=0;
 
   if(useAPI){
-   toast('📍 LocationIQ ile TÜM öğrenciler yenileniyor... (bu biraz sürebilir)','info');
+   toast('📍 Google Maps ile TÜM öğrenciler yenileniyor... (bu biraz sürebilir)','info');
    const result = await geocodeBatch(students);
    changed = result.updated; apiOk = result.apiOk; apiFailed = result.apiFailed; apiPartial = result.apiPartial||0;
   }
