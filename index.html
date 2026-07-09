@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="202606051021">
+<meta name="app-version" content="202607091021">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1590,7 +1590,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.06.20-17</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.09-18</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -4488,6 +4488,22 @@ const SCHOOLS=[
  girisH:8,girisM:0, cikisH:15,cikisM:45,
  color:"#8b5cf6", icon:""},
 ];
+// Varsayılan (hardcoded) okulların key listesi — silme takibi için sabit referans
+const DEFAULT_SCHOOL_KEYS = SCHOOLS.map(s => s.key);
+// Daha önce silinmiş varsayılan okulları localStorage'dan oku ve SCHOOLS'tan çıkar
+// (Bu olmadan hardcoded okullar her sayfa yenilemesinde/güncellemede geri geliyordu)
+window._deletedDefaultSchools = (function(){
+  try{
+    const raw = localStorage.getItem('konseltur_deleted_defaults_v1');
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  }catch(e){ return []; }
+})();
+if(window._deletedDefaultSchools.length){
+  for(let i = SCHOOLS.length - 1; i >= 0; i--){
+    if(window._deletedDefaultSchools.includes(SCHOOLS[i].key)) SCHOOLS.splice(i, 1);
+  }
+}
 // SC: SCHOOLS array'inden otomatik türetilir — yeni okul eklenince otomatik genişler
 const SC = SCHOOLS.map(s =>s.color);
 const RC=["#60a5fa","#f59e0b","var(--green)","#f87171","#a78bfa","#fb923c","#e879f9","#4ade80","#38bdf8","#f472b6","#facc15","#86efac","#c4b5fd","#fecaca","#67e8f9","#fed7aa","#d9f99d","#bbf7d0","#e9d5ff","#fca5a5","#a5f3fc","#ddd6fe","#fde68a"];
@@ -4823,6 +4839,8 @@ function syncColorFromHex(hex){
 document.addEventListener('DOMContentLoaded', ()=>{
  // Ek okulları localStorage/Firebase'den yükle (sayfa yenilenince kaybolmasın)
  _loadExtraSchools();
+ // Başka bir cihazda silinmiş varsayılan okulları da senkronize et
+ _loadDeletedDefaultsFromFirebase();
 
  const cp = document.getElementById('asc-color');
  if(cp) cp.addEventListener('input', function(){ const h=document.getElementById('asc-color-hex'); if(h) h.value=this.value; });
@@ -4949,14 +4967,60 @@ async function saveNewSchool(){
 
 async function _saveSchoolsToStorage(){
   try{
-    // Sadece ek okulları (index 3+) kaydet — ilk 3 hardcoded
-    const extras = SCHOOLS.slice(3);
+    // Ek okulları kaydet — varsayılan (hardcoded) key'e sahip olmayan okullar
+    // (index 3+ varsayımı yanlıştı: bir varsayılan okul silinince index'ler kayıyordu)
+    const extras = SCHOOLS.filter(s => !DEFAULT_SCHOOL_KEYS.includes(s.key));
     localStorage.setItem('konseltur_extra_schools_v1', JSON.stringify(extras));
     // Firebase'e de yaz — tamamlanmasını bekle (race condition önleme)
     if(window._fbDb && window._fbSet && window._fbRef){
       await window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/extra_schools'), extras);
     }
   }catch(e){ console.error('Okul kaydedilemedi:',e); }
+}
+
+// Varsayılan (hardcoded) bir okul silindiğinde bunu kalıcı olarak işaretler,
+// böylece sayfa yenilenince/güncellenince SCHOOLS array'i yeniden oluştuğunda geri gelmez
+async function _saveDeletedDefaultSchool(key){
+  try{
+    if(!window._deletedDefaultSchools.includes(key)){
+      window._deletedDefaultSchools.push(key);
+    }
+    localStorage.setItem('konseltur_deleted_defaults_v1', JSON.stringify(window._deletedDefaultSchools));
+    if(window._fbDb && window._fbSet && window._fbRef){
+      await window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/deleted_default_schools'), window._deletedDefaultSchools);
+    }
+  }catch(e){ console.error('Silinen varsayılan okul kaydedilemedi:',e); }
+}
+
+// Başka bir cihazda/oturumda silinmiş varsayılan okulları Firebase'den senkronize eder
+function _loadDeletedDefaultsFromFirebase(){
+  if(window._fbDb && window._fbGet && window._fbRef){
+    window._fbGet(window._fbRef(window._fbDb,'konseltur/GLOBAL/deleted_default_schools')).then(snap=>{
+      if(snap && snap.exists()){
+        const remote = snap.val();
+        const list = Array.isArray(remote) ? remote : Object.values(remote||{});
+        let changed = false;
+        list.forEach(key=>{
+          if(!key) return;
+          if(!window._deletedDefaultSchools.includes(key)){
+            window._deletedDefaultSchools.push(key);
+            changed = true;
+          }
+          const idx = SCHOOLS.findIndex(s=>s.key===key);
+          if(idx !== -1){
+            SCHOOLS.splice(idx,1);
+            SC.splice(idx,1);
+            changed = true;
+          }
+        });
+        if(changed){
+          try{ localStorage.setItem('konseltur_deleted_defaults_v1', JSON.stringify(window._deletedDefaultSchools)); }catch(e){}
+          _refreshSchoolMaps();
+          if(typeof renderLoginSchoolCards==='function') renderLoginSchoolCards();
+        }
+      }
+    }).catch(()=>{});
+  }
 }
 
 function _loadExtraSchools(){
@@ -5117,6 +5181,11 @@ async function _doDeleteSchool(idx, key){
  SC.splice(idx, 1);
  _refreshSchoolMaps();
  renderLoginSchoolCards();
+ // Silinen okul varsayılan (hardcoded) okullardan biriyse, kalıcı olarak işaretle —
+ // aksi halde SCHOOLS array'i yeniden oluşturulduğunda (sayfa yenileme/güncelleme) geri gelir
+ if(DEFAULT_SCHOOL_KEYS.includes(key)){
+   await _saveDeletedDefaultSchool(key);
+ }
  await _saveSchoolsToStorage();
 }
 
