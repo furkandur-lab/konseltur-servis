@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="202607092350">
+<meta name="app-version" content="202607100045">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.09-22</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.10-24</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -7357,7 +7357,7 @@ function _updateRotaFilterDropdown(){
  if(!sel) return;
  var cur=sel.value;
  var html='<option value="">Tüm Rotalar</option><option value="none">Rotasız</option>';
- routes.forEach(function(r){ html+='<option value="'+r.id+'">'+escHtml(r.label)+'</option>'; });
+ routes.forEach(function(r){ html+='<option value="'+r.id+'">'+escHtml(_routeDisplayName(r))+'</option>'; });
  sel.innerHTML=html;
  sel.value=cur;
 }
@@ -8574,6 +8574,17 @@ function doOpt(){
  document.getElementById('modal').classList.add('open');
 }
 
+// Rota ekranda nasıl adlandırılsın: şoför atanmışsa şoförün adı, atanmamışsa
+// otomatik ilçe etiketi ("Karatay 1" vb.). r.label'ın kendisi değişmez —
+// sadece görüntüleme metni budur (rota yeniden adlandırma / eşleştirme mantığı bozulmasın diye)
+function _routeDisplayName(r){
+ if(r && r.driverId){
+  const d = drivers.find(x=>x.id===r.driverId);
+  if(d && d.name) return d.name;
+ }
+ return r ? r.label : '';
+}
+
 // Şoför atama güncelleme 
 function assignDriver(rid, did){
  const r = routes[rid];
@@ -8816,7 +8827,7 @@ function renderRoutes(){
  <div class="route-header" onclick="toggleR(${r.id})">
  <div class="route-dot" style="background:${r.color}"></div>
  <div style="flex:1">
- <div class="route-name">${r.label}<span onclick="event.stopPropagation();renameRoute(${r.id})" style="cursor:pointer;font-size:12px;margin-left:6px;opacity:.6" title="Adını Değiştir">✏️</span><span style="font-size:10px;background:${r.color}22;color:${r.color};padding:2px 6px;border-radius:4px;margin-left:4px">${sch.short}</span><span style="font-size:10px;color:${capColor};background:${capColor}22;padding:2px 6px;border-radius:4px;margin-left:4px">${r.students.length} &ouml;&#x11F;renci</span>${capWarning}${timeBadge}${outlierIds.size?`<span style="font-size:10px;color:var(--red);background:rgba(239,68,68,.12);padding:2px 6px;border-radius:4px;margin-left:4px">&#x1F534; ${outlierIds.size} ayk&#x131;r&#x131;</span>`:''}</div>
+ <div class="route-name">${_routeDisplayName(r)}<span onclick="event.stopPropagation();renameRoute(${r.id})" style="cursor:pointer;font-size:12px;margin-left:6px;opacity:.6" title="Adını Değiştir">✏️</span><span style="font-size:10px;background:${r.color}22;color:${r.color};padding:2px 6px;border-radius:4px;margin-left:4px">${sch.short}</span><span style="font-size:10px;color:${capColor};background:${capColor}22;padding:2px 6px;border-radius:4px;margin-left:4px">${r.students.length} &ouml;&#x11F;renci</span>${capWarning}${timeBadge}${outlierIds.size?`<span style="font-size:10px;color:var(--red);background:rgba(239,68,68,.12);padding:2px 6px;border-radius:4px;margin-left:4px">&#x1F534; ${outlierIds.size} ayk&#x131;r&#x131;</span>`:''}</div>
  <div class="route-meta">${fmtKm(r.km)} &middot; <span style="color:${r.overTime?'var(--amber)':'var(--muted2)'}">~${fmtMin(r.min)}</span> &middot; <span style="color:${hc};font-weight:600">${hLabel} (${hs})</span>${ad?' &middot; &#x1F9D1;&#x200D;&#x2708;&#xFE0F; '+ad.name:' &middot; <span style="color:var(--red)">&#x15E;of&ouml;r atanmad&#x131;</span>'}</div>
  </div>
  <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRouteEdit(${r.id})" style="margin-right:6px;font-size:11px;">Düzenle</button>
@@ -10034,7 +10045,7 @@ function exportRotalarPDF(){
  <!-- Rota başlık -->
  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:${r.color}18;border-left:4px solid ${r.color};border-radius:4px;margin-bottom:12px;">
  <div>
- <span style="font-size:16px;font-weight:800;color:${r.color};">${r.label}</span>
+ <span style="font-size:16px;font-weight:800;color:${r.color};">${_routeDisplayName(r)}</span>
  <span style="font-size:12px;color:#666;margin-left:10px;">${sch.short}</span>
  </div>
  <div style="display:flex;gap:16px;font-size:12px;color:#444;">
@@ -10332,7 +10343,7 @@ function exportOgrenciExcel(){
  s.sok || '',
  s.no || '',
  s.ph || '',
- r ? r.label : '–'
+ r ? _routeDisplayName(r) : '–'
  ];
  });
 
@@ -10808,7 +10819,7 @@ function renderMapLayers(){
  const color = r.color;
  const pos = spreadCoords[idx];
  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2.5"/><text x="14" y="18" font-family="Arial,sans-serif" font-size="11" font-weight="800" fill="#111" text-anchor="middle">${idx+1}</text></svg>`;
- const pop = `<div><span class="lf-route-badge" style="background:${color}22;color:${color};">${r.label} · Durak ${idx+1}</span><br>
+ const pop = `<div><span class="lf-route-badge" style="background:${color}22;color:${color};">${_routeDisplayName(r)} · Durak ${idx+1}</span><br>
  <strong>${escHtml(s.name)}</strong><br>
  <span style="color:var(--muted2);">${escHtml(s.ilce)} / ${escHtml(s.mah)}</span><br>
  ${s.sok?`<span style="color:var(--muted2);">${escHtml(s.sok)}</span><br>`:''}
@@ -10928,7 +10939,7 @@ function renderMapLayers(){
  if(sel){
  const cur = sel.value;
  sel.innerHTML = '<option value="all">Tüm Rotalar</option>' +
- routes.map(r=>`<option value="${r.id}">${r.label} — ${SCHOOLS[r.school].short} (${r.students.length} kişi)</option>`).join('');
+ routes.map(r=>`<option value="${r.id}">${_routeDisplayName(r)} — ${SCHOOLS[r.school].short} (${r.students.length} kişi)</option>`).join('');
  sel.value = cur;
  }
 
@@ -10938,7 +10949,7 @@ function renderMapLayers(){
  leg.innerHTML = activeRoutes.slice(0,15).map(r=>
  `<div style="display:flex;align-items:center;gap:5px;font-size:11px;">
  <div style="width:12px;height:12px;border-radius:3px;background:${r.color};flex-shrink:0;"></div>
- <span style="color:var(--muted2);">${r.label}</span>
+ <span style="color:var(--muted2);">${_routeDisplayName(r)}</span>
  <span style="color:var(--text);font-weight:600;">${r.students.length}k</span>
  </div>`
  ).join('') + (routes.length===0?'<span style="color:var(--muted2);font-size:12px;">Önce rota oluşturun</span>':'');
@@ -11007,23 +11018,72 @@ function mapSearchStudent(query){
  const _activeSchIdx = getSchoolIdx(_activeSchoolKey);
  const matches = students.filter(s => s.school===_activeSchIdx && _normalizeText(s.name||'').indexOf(norm) !== -1).slice(0, 15);
 
+ // Adres/sokak olarak arama seçeneği — kayıtlı olmayan bir yeri de haritada bulabilmek için,
+ // öğrenci eşleşmesi olsun ya da olmasın her zaman gösterilir
+ // JSON.stringify: geçerli bir JS string literali üretir (iç tırnaklar/ters bölü işaretleri kaçırılır);
+ // ardından tek tırnaklı onclick niteliği için HTML-safe hale getirilir (arama metninde ' veya " olsa bile bozulmaz)
+ const jsArg = JSON.stringify(q).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+ const addrOption = `<div id="map-search-as-address" onclick='mapSearchAsAddress(${jsArg})' style="padding:9px 12px;cursor:pointer;background:rgba(59,130,246,.06);" onmouseover="this.style.background='rgba(59,130,246,.14)'" onmouseout="this.style.background='rgba(59,130,246,.06)'">
+  <div style="font-size:12px;font-weight:600;color:#60a5fa;">🔍 "${escHtml(q)}" adresini haritada göster</div>
+  <div style="font-size:10px;color:var(--muted2);margin-top:2px;">Kayıtlı olmayan bir sokak/adres için</div>
+ </div>`;
+
  if(!matches.length){
   box.style.display='block';
-  box.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--muted2);text-align:center;">Sonuç bulunamadı</div>';
+  box.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--muted2);text-align:center;border-bottom:1px solid var(--border);">Öğrenci sonucu bulunamadı</div>' + addrOption;
   return;
  }
 
  box.innerHTML = matches.map(s=>{
   const rt = routes.find(r=>r.students.some(rs=>rs.id===s.id));
   const servisHtml = rt
-   ? `<span style="font-size:10px;color:${rt.color};font-weight:600;">${escHtml(rt.label)}</span>`
+   ? `<span style="font-size:10px;color:${rt.color};font-weight:600;">${escHtml(_routeDisplayName(rt))}</span>`
    : `<span style="font-size:10px;color:var(--red);font-weight:600;">Servis yok</span>`;
   return `<div onclick="mapGoToStudent(${s.id})" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
    <div style="font-size:12px;font-weight:600;">${escHtml(s.name)}</div>
    <div style="font-size:10px;color:var(--muted2);margin-top:2px;">${escHtml(s.ilce||'–')} / ${escHtml(s.mah||'–')} · ${servisHtml}</div>
   </div>`;
- }).join('');
+ }).join('') + addrOption;
  box.style.display='block';
+}
+
+// Kayıtlı olmayan bir sokak/adresi haritada bul — Google Geocoding ile arar,
+// haritayı o noktaya odaklar ve geçici bir işaretçi (pin) bırakır
+let _mapAddressSearchMarker = null;
+async function mapSearchAsAddress(query){
+ if(!_map){ toast('⚠️ Önce haritanın yüklenmesini bekleyin','error'); return; }
+ const el = document.getElementById('map-search-as-address');
+ if(el) el.innerHTML = '<div style="padding:2px 0;font-size:12px;color:var(--muted2);">🔄 Aranıyor…</div>';
+ try{
+  const coord = await geocodeAddress(query, null, null);
+  if(!coord){
+   toast('❌ "'+query+'" için adres bulunamadı','error');
+   if(el) el.innerHTML = '<div style="font-size:12px;font-weight:600;color:var(--red);">❌ Adres bulunamadı — farklı yazmayı deneyin</div>';
+   return;
+  }
+  // Önceki geçici işaretçiyi temizle
+  if(_mapAddressSearchMarker){ _mapAddressSearchMarker.setMap(null); _mapAddressSearchMarker=null; }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26"><circle cx="13" cy="13" r="10" fill="#60a5fa" stroke="white" stroke-width="2.5"/><text x="13" y="18" font-family="Arial,sans-serif" font-size="13" font-weight="800" fill="#111" text-anchor="middle">?</text></svg>`;
+  _mapAddressSearchMarker = new google.maps.Marker({
+   position: {lat:coord.lat, lng:coord.lng},
+   map: _map,
+   icon: _svgIcon(svg, 26, 26, 13, 13),
+   zIndex: 300
+  });
+  const pop = `<div><strong>${escHtml(query)}</strong><br><span style="font-size:11px;color:var(--muted2);">Aranan adres (kayıtlı öğrenci değil)</span></div>`;
+  _mapAddressSearchMarker.addListener('click', ()=>{ _mapInfoWindow.setContent(pop); _mapInfoWindow.open(_map, _mapAddressSearchMarker); });
+  _map.panTo({lat:coord.lat, lng:coord.lng});
+  _map.setZoom(17);
+  _mapInfoWindow.setContent(pop);
+  _mapInfoWindow.open(_map, _mapAddressSearchMarker);
+  // Arama kutusunu kapat
+  const box = document.getElementById('map-search-results');
+  if(box){ box.style.display='none'; box.innerHTML=''; }
+  toast('📍 Adres haritada gösterildi');
+ }catch(e){
+  console.warn('mapSearchAsAddress hata:', e);
+  toast('❌ Adres aranırken hata oluştu','error');
+ }
 }
 
 function mapGoToStudent(studentId){
@@ -11597,7 +11657,7 @@ function startMoveStudent(studentId, fromRouteId){
  var clickAttr = full ? '' : 'onclick="executeMoveStudent('+r.id+')"';
  html += '<div '+clickAttr+' style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--card2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:'+(full?'not-allowed':'pointer')+';opacity:'+(full?'0.5':'1')+';transition:all .15s;">';
  html += '<div style="width:12px;height:12px;border-radius:3px;background:'+r.color+';flex-shrink:0;"></div>';
- html += '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+escHtml(r.label)+'</div>';
+ html += '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+escHtml(_routeDisplayName(r))+'</div>';
  html += '<div style="font-size:11px;color:var(--muted2);">'+count+'/20 öğrenci · ~'+Math.round(dur)+' dk</div></div>';
  if(full) html += '<span style="font-size:10px;color:var(--red);">Dolu</span>';
  else html += '<span style="font-size:18px;">→</span>';
@@ -11701,7 +11761,7 @@ function openRouteEdit(rid){
  _remRouteId = rid;
  _remStudents = r.students.map(s=>({...s}));
  _remSchool = r.school;
- _setText('rem-title', ` ${r.label} — Düzenle`);
+ _setText('rem-title', ` ${_routeDisplayName(r)} — Düzenle`);
  _setText('rem-sub', `${SCHOOLS[r.school].name} · Mevcut ${r.students.length} öğrenci`);
  renderRemModal();
  document.getElementById('route-edit-modal').classList.add('open');
