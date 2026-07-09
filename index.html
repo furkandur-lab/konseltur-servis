@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="202607092310">
+<meta name="app-version" content="202607092350">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.09-21</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.09-22</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -6794,20 +6794,11 @@ async function geocodeAddress(fullAddr, ilce, mah){
    if(res && res.results && res.results[0]){
     const loc = res.results[0].geometry.location;
     const coord = {lat: loc.lat(), lng: loc.lng(), source:'google'};
-    // Konya sınırı içinde mi kontrol et
+    // Konya sınırı içinde mi kontrol et (bölgesel sağlamlık kontrolü yeterli;
+    // eski "mahalle merkezinden >4km ise reddet" kontrolü kaldırıldı — Google'ın
+    // doğru bulduğu adresleri, mahalle merkezinin sadece kaba/tek bir nokta olması
+    // yüzünden yanlışlıkla reddedip yerine o kaba noktayı koyuyordu)
     if(coord.lat>=KONYA_SW[0]&&coord.lat<=KONYA_NE[0]&&coord.lng>=KONYA_SW[1]&&coord.lng<=KONYA_NE[1]){
-     // Sağlamlık kontrolü: bilinen mahalle merkezinden çok uzaksa (>4km) güvenilmez say
-     if(ilce && mah){
-      const mahCenter = getCoord(ilce, mah);
-      if(mahCenter && mahCenter.lat){
-       const dLat = coord.lat - mahCenter.lat, dLng = coord.lng - mahCenter.lng;
-       const distKm = Math.sqrt(dLat*dLat + dLng*dLng) * 111; // yaklaşık km
-       if(distKm > 4){
-        console.warn('Geocode sonucu mahalle merkezinden çok uzak ('+distKm.toFixed(1)+'km), reddedildi:', fullAddr);
-        return null;
-       }
-      }
-     }
      _geocodeCache[cacheKey] = coord;
      return coord;
     }
