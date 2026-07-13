@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="202607100115">
+<meta name="app-version" content="202607101200">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.10-25</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.10-26</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -5334,14 +5334,13 @@ async function enterKasaDirect(){
     }
   };
 
-  // loadCariData senkron (localStorage) + async (Firebase)
-  // localStorage'dan anında yüklenmiş olmalı
-  if(Object.keys(_cariData||{}).length > 0){
-    _openKasa();
-  } else {
-    // Firebase yüklenmesini bekle
-    setTimeout(_openKasa, 400);
-  }
+  // ÖNEMLİ: "_cariData doluysa hemen aç" sezgisiyle karar vermek tehlikeliydi —
+  // bu cihazın localStorage'ı eski/eksik olabilir, Kasa kaydı Firebase'de
+  // gerçekten var olsa bile burada "yok" sanılıp yenisi oluşturulabilir ve
+  // kayıt sırasında başka bir cihazda az önce girilmiş veriler silinebilirdi.
+  // Artık gerçek Firebase senkronizasyonunu (veya makul bir zaman aşımını) bekliyoruz.
+  await _waitCariSync();
+  _openKasa();
 }
 
 
@@ -6312,7 +6311,22 @@ let _editingGorevId = null;
 
 const LS_GOREV = () => 'konseltur_gorev_v1_' + (_activeSchoolKey||'GLOBAL');
 
+// RACE CONDITION KORUMASI — cari/şoför modüllerindeki aynı hata burada da mümkündü
+window._gorevFbSynced = false;
+let _lastGorevSaveAt = 0;
+function _waitGorevSync(){
+  if(window._gorevFbSynced || (typeof navigator!=='undefined' && navigator.onLine===false)) return Promise.resolve();
+  return new Promise(resolve=>{
+    const t0 = Date.now();
+    const iv = setInterval(()=>{
+      if(window._gorevFbSynced || Date.now()-t0 > 5000){ clearInterval(iv); resolve(); }
+    }, 100);
+  });
+}
+
 function loadGorevData(){
+  window._gorevFbSynced = false;
+  const reqTime = Date.now();
   try{
     const raw = localStorage.getItem(LS_GOREV());
     if(raw) _gorevData = JSON.parse(raw);
@@ -6323,24 +6337,37 @@ function loadGorevData(){
       if(window._fbGorevUnsub) try{ window._fbGorevUnsub(); }catch(_){}
       const dbRef = window._fbRef(window._fbDb, 'konseltur/' + (_activeSchoolKey||'GLOBAL') + '/gorev');
       window._fbGorevUnsub = window._fbOnValue(dbRef, snap=>{
+        window._gorevFbSynced = true;
+        // Bu dinleyici kurulduktan SONRA yerel bir kayıt yapıldıysa, gelen anlık görüntü
+        // muhtemelen o kaydı henüz içermiyordur — üzerine yazma
+        if(_lastGorevSaveAt > reqTime) return;
         const val = snap.val();
-        if(val && Array.isArray(val)){ _gorevData = val; }
-        else if(val && typeof val === 'object'){ _gorevData = Object.values(val); }
+        let fbGorev = [];
+        if(val && Array.isArray(val)) fbGorev = val;
+        else if(val && typeof val === 'object') fbGorev = Object.values(val);
+        // Id bazlı güvenli birleştirme (blind overwrite yerine)
+        const map = {};
+        (_gorevData||[]).forEach(x=>{ if(x&&x.id!=null) map[x.id]=x; });
+        fbGorev.forEach(x=>{ if(x&&x.id!=null) map[x.id]=x; }); // fb üzerine yazar (daha güncel)
+        _gorevData = Object.values(map);
         try{ localStorage.setItem(LS_GOREV(), JSON.stringify(_gorevData)); }catch(_){}
         if(_currentPage === 'gorev') renderGorevList();
-      }, e=>console.warn('Görev FB hatası:', e));
+      }, e=>{ console.warn('Görev FB hatası:', e); window._gorevFbSynced = true; });
+    } else {
+      window._gorevFbSynced = true;
     }
-  }catch(e){}
+  }catch(e){ window._gorevFbSynced = true; }
 }
 
-function saveGorevData(){
+async function saveGorevData(){
+  _lastGorevSaveAt = Date.now();
+  await _waitGorevSync();
   try{ localStorage.setItem(LS_GOREV(), JSON.stringify(_gorevData)); }catch(e){}
   try{
     if(window._fbDb && window._fbRef && window._fbSet){
-      window._fbSet(window._fbRef(window._fbDb, 'konseltur/' + (_activeSchoolKey||'GLOBAL') + '/gorev'), _gorevData)
-        .catch(e=>console.warn('Görev FB kayıt:', e));
+      await window._fbSet(window._fbRef(window._fbDb, 'konseltur/' + (_activeSchoolKey||'GLOBAL') + '/gorev'), _gorevData);
     }
-  }catch(e){}
+  }catch(e){ console.warn('Görev FB kayıt:', e); }
 }
 
 function openGorevModal(id){
@@ -6651,11 +6678,16 @@ function loadPayments(){
  }
 }
 
+// Aynı sınıf hata Ücret ödemelerinde de riskliydi (GLOBAL düğüm + tam üzerine yazma) —
+// cari düzeltmesiyle aynı korumayı burada da uyguluyoruz.
+window._paymentsFbSynced = false;
+
 function _loadPaymentsFromFirebase(){
- if(!window._fbDb || !window._fbOnValue || !window._fbRef) return;
+ if(!window._fbDb || !window._fbOnValue || !window._fbRef){ window._paymentsFbSynced = true; return; }
 
  // 1. GLOBAL payments path'ini realtime dinle (yeni sistem)
  window._fbOnValue(window._fbRef(window._fbDb, 'konseltur/GLOBAL/ucret_payments'), function(snapshot){
+   window._paymentsFbSynced = true;
    if(snapshot && snapshot.exists()){
      const d = snapshot.val();
      if(d && typeof d==='object'){
@@ -6671,6 +6703,17 @@ function _loadPaymentsFromFirebase(){
      // GLOBAL boş veya eksik — migration yap
      _migrateOldPayments();
    }
+ });
+}
+
+// Ücret ödemeleri için Firebase senkron bekleme — bkz. _waitCariSync (aynı mantık)
+function _waitPaymentsSync(){
+ if(window._paymentsFbSynced || (typeof navigator!=='undefined' && navigator.onLine===false)) return Promise.resolve();
+ return new Promise(resolve=>{
+  const t0 = Date.now();
+  const iv = setInterval(()=>{
+   if(window._paymentsFbSynced || Date.now()-t0 > 5000){ clearInterval(iv); resolve(); }
+  }, 100);
  });
 }
 
@@ -9437,7 +9480,7 @@ function updatePmSummary(){
  _setText('pm-remaining', aktifAylar.length-paidCount);
 }
 
-function savePayments(){
+async function savePayments(){
  if(!_editingStudentId) return;
  // Tutar doğrulama
  let _tutatHata = false;
@@ -9472,6 +9515,8 @@ function savePayments(){
    toast('✅ Ödeme kaydedildi');
    flashSaveDot();
  };
+ // Güvenlik kilidi: Firebase'in son halini görmeden GLOBAL ödeme düğümünün üzerine yazma
+ await _waitPaymentsSync();
  if(window._fbReady && window._fbDb){
    // Global ID ile doğrudan GLOBAL/payments path'ine yaz — tüm cihazlar aynı path'i okur
    window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/ucret_payments'), payments)
@@ -12464,7 +12509,22 @@ const SOFOR_AYLAR = [
 function LS_SOFOR(){ return 'konseltur_sofor_v1_GLOBAL'; }
 function LS_SOFORPAY(){ return 'konseltur_soforpay_v1_GLOBAL'; }
 
+// RACE CONDITION KORUMASI — cari/ödeme modüllerindeki aynı hatanın şoför verisinde de
+// mümkün olduğu tespit edildi: senkron beklemesi hiç yoktu, blind overwrite vardı.
+window._soforFbSynced = false;
+let _lastSoforSaveAt = 0;
+function _waitSoforSync(){
+  if(window._soforFbSynced || (typeof navigator!=='undefined' && navigator.onLine===false)) return Promise.resolve();
+  return new Promise(resolve=>{
+    const t0 = Date.now();
+    const iv = setInterval(()=>{
+      if(window._soforFbSynced || Date.now()-t0 > 5000){ clearInterval(iv); resolve(); }
+    }, 100);
+  });
+}
+
 function loadSoforData(){
+  const reqTime = Date.now();
   try {
     const raw = localStorage.getItem(LS_SOFOR());
     if(raw){ const d=JSON.parse(raw); soforler=Array.isArray(d.soforler)?d.soforler:[]; nSid2=Number(d.nSid2)||soforler.length+1; }
@@ -12477,11 +12537,20 @@ function loadSoforData(){
   if(window._fbReady && window._fbDb){
     const path = 'konseltur/GLOBAL/sofor';
     window._fbOnValue(window._fbRef(window._fbDb, path), snap=>{
+      window._soforFbSynced = true;
+      // Bu dinleyici kurulduktan SONRA yerel bir kayıt yapıldıysa, gelen anlık görüntü
+      // muhtemelen o kaydı henüz içermiyordur — üzerine yazma (bkz. Cari modülündeki aynı düzeltme)
+      if(_lastSoforSaveAt > reqTime) return;
       const d = snap.val();
       if(d){
-        soforler = Array.isArray(d.soforler)?d.soforler:[];
-        nSid2 = Number(d.nSid2)||soforler.length+1;
-        soforPayments = (d.payments&&typeof d.payments==='object')?d.payments:{};
+        // Blind overwrite yerine id bazlı güvenli birleştirme
+        const fbSoforler = Array.isArray(d.soforler) ? d.soforler : [];
+        const map = {};
+        soforler.forEach(x=>{ if(x&&x.id!=null) map[x.id]=x; });
+        fbSoforler.forEach(x=>{ if(x&&x.id!=null) map[x.id]=x; }); // fb üzerine yazar (daha güncel)
+        soforler = Object.values(map);
+        nSid2 = Math.max(Number(d.nSid2)||0, nSid2, soforler.length+1);
+        soforPayments = Object.assign({}, soforPayments, (d.payments&&typeof d.payments==='object')?d.payments:{});
         try{ localStorage.setItem(LS_SOFOR(), JSON.stringify({soforler, nSid2})); }catch(e){}
         try{ localStorage.setItem(LS_SOFORPAY(), JSON.stringify(soforPayments)); }catch(e){}
         if(currentApp==='sofor') renderSoforListe();
@@ -12516,7 +12585,11 @@ function _remapRouteSoforIds(){
   });
 }
 
-function saveSoforData(){
+async function saveSoforData(){
+  // Bu kaydın zamanını damgala — yukarıdaki dinleyici, bu andan sonra gelecek eski/gecikmeli
+  // Firebase anlık görüntülerinin bu kaydın üzerine yazmasını böylece engelleyebilir
+  _lastSoforSaveAt = Date.now();
+  await _waitSoforSync();
   const payload = {soforler, nSid2, payments:soforPayments, savedAt:Date.now()};
   try{ localStorage.setItem(LS_SOFOR(), JSON.stringify({soforler, nSid2})); }catch(e){}
   try{ localStorage.setItem(LS_SOFORPAY(), JSON.stringify(soforPayments)); }catch(e){}
@@ -14240,7 +14313,22 @@ function _esc(s){ const d=document.createElement('div'); d.textContent=s||''; re
 
 function _cariLsKey(){ return 'konseltur_cari_v1_GLOBAL'; }
 
+// Cari verisi Firebase'den en az bir kez GERÇEKTEN senkronize oldu mu?
+// Bu bayrak false iken _cariData'ya güvenilmez (localStorage'daki eski/eksik
+// kopya olabilir) — kritik: bu haldeyken Firebase'e yazmak, başka bir cihazda
+// az önce girilmiş veriyi SİLEBİLİR (tüm GLOBAL cari düğümünü değiştiriyoruz).
+window._cariFbSynced = false;
+
+// RACE CONDITION KORUMASI (ana öğrenci/rota senkronizasyonundaki ile aynı desen):
+// Kullanıcı, ilk Firebase anlık görüntüsü henüz gelmeden (örn. Cari ekranına girer
+// girmez) yeni bir kayıt eklerse, o an gelen eski/gecikmeli Firebase anlık görüntüsü
+// _cariData'nın ÜZERİNE YAZIP yeni eklenen kaydı sessizce SİLEBİLİYORDU. Bu, bildirilen
+// "Cari'ye veri girdim, bir süre sonra kayboldu" hatasının kök nedeniydi.
+let _lastCariSaveAt = 0;
+
 function loadCariData(){
+  window._cariFbSynced = false;
+  const reqTime = Date.now();
   try{
     const raw = localStorage.getItem(_cariLsKey());
     if(raw) _cariData = JSON.parse(raw);
@@ -14252,19 +14340,50 @@ function loadCariData(){
       if(window._fbCariUnsubscribe) try{ window._fbCariUnsubscribe(); }catch(_){}
       const dbRef = window._fbRef(window._fbDb, 'konseltur/GLOBAL/cari');
       window._fbCariUnsubscribe = window._fbOnValue(dbRef, snap=>{
+        window._cariFbSynced = true; // İlk (veya sonraki) gerçek Firebase anlık görüntüsü geldi
+        // Bu dinleyici kurulduktan SONRA yerel bir kayıt yapıldıysa, gelen anlık görüntü
+        // muhtemelen o kaydı henüz içermiyordur (gecikmeli/eski) — üzerine yazma.
+        if(_lastCariSaveAt > reqTime){ return; }
         const val = snap.val();
         if(val){
-          _cariData = val;
+          // Blind overwrite yerine güvenli birleştirme: Firebase'deki kayıtlar önceliklidir,
+          // ama yerel bellekte olup Firebase'e henüz ulaşmamış kayıtlar (örn. aynı anda
+          // başka bir yazma bekleniyorsa) kaybolmaz.
+          _cariData = Object.assign({}, _cariData, val);
           try{ localStorage.setItem(_cariLsKey(), JSON.stringify(_cariData)); }catch(e){}
           if(_currentPage==='cari-liste') renderCariListe();
           if(_currentPage==='cari-detay' && window._activeCariId) renderCariDetay(window._activeCariId);
         }
-      }, e=>{ console.warn('Cari FB dinleme hatası:', e); });
+      }, e=>{ console.warn('Cari FB dinleme hatası:', e); window._cariFbSynced = true; /* hata olsa da sonsuza dek bekletme */ });
+    } else {
+      // Firebase yapılandırılmamış — beklenecek bir şey yok, yerel veriyle devam
+      window._cariFbSynced = true;
     }
-  }catch(e){}
+  }catch(e){ window._cariFbSynced = true; }
+}
+
+// Firebase'den ilk gerçek senkronizasyonu bekler. ÇOK ÖNEMLİ: bu bekleme olmadan,
+// bu cihazdaki eski/eksik localStorage kopyası üzerine yeni bir kayıt eklenip
+// kaydedilirse, Firebase'deki (başka bir cihazda girilmiş) güncel veri SİLİNİR —
+// çünkü kayıt işlemi tüm GLOBAL cari düğümünü bu cihazın elindeki kopyayla değiştirir.
+// İnternet yoksa veya 5 saniyede yanıt gelmezse, sonsuza kadar kilitlemek yerine
+// elimizdeki veriyle devam edilir.
+function _waitCariSync(){
+  if(window._cariFbSynced || (typeof navigator!=='undefined' && navigator.onLine===false)) return Promise.resolve();
+  return new Promise(resolve=>{
+    const t0 = Date.now();
+    const iv = setInterval(()=>{
+      if(window._cariFbSynced || Date.now()-t0 > 5000){ clearInterval(iv); resolve(); }
+    }, 100);
+  });
 }
 
 async function _saveCariToStorage(){
+  // Bu kaydın zamanını damgala — yukarıdaki dinleyici, bu andan sonra gelecek eski/gecikmeli
+  // Firebase anlık görüntülerinin bu kaydın üzerine yazmasını böylece engelleyebilir
+  _lastCariSaveAt = Date.now();
+  // Güvenlik kilidi: Firebase'in gerçek son halini görmeden ASLA üzerine yazma
+  await _waitCariSync();
   try{ localStorage.setItem(_cariLsKey(), JSON.stringify(_cariData)); }catch(e){}
   try{
     if(window._fbDb && window._fbRef && window._fbSet){
