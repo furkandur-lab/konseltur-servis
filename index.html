@@ -1589,7 +1589,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-47</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-48</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17434,6 +17434,104 @@ function _saveAraclar(list){
     try{ window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/arac_takip'), fbObj); }catch(e){}
   }
 }
+// Excel'den araç listesi içe aktarma — PLAKA, TİP, SİGORTA, MUAYENE/VİZE, NOT
+// sütunlarını tanır. Aynı plaka zaten kayıtlıysa, o aracın sigorta/muayene/not
+// bilgilerini GÜNCELLER (çift kayıt oluşturmaz).
+function _atImportExcel(event){
+  var file = event.target.files[0];
+  if(!file) return;
+  event.target.value = '';
+  _ensureXLSX(function(){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var data = new Uint8Array(e.target.result);
+        var workbook = XLSX.read(data, {type:'array', cellDates:true});
+        var sheetName = workbook.SheetNames.find(function(sn){
+          var u = sn.toUpperCase();
+          return u.includes('ARAÇ') || u.includes('ARAC') || u.includes('SİGORTA') || u.includes('VİZE') || u.includes('MUAYENE');
+        }) || workbook.SheetNames[0];
+        var ws = workbook.Sheets[sheetName];
+        // raw:true — cellDates:true ile tarih hücreleri gerçek Date nesnesi olarak gelsin
+        // (raw:false kullanılsaydı İş Başvuruları'nda yaşadığımız "tarihler aktarılmıyor"
+        // hatası burada da tekrarlanırdı)
+        var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+        if(!rows || rows.length < 2){ toast('❌ Sekme boş görünüyor','error'); return; }
+
+        let hRow = -1, cols = {};
+        for(var ri=0; ri<Math.min(6, rows.length); ri++){
+          var rowU = (rows[ri]||[]).map(function(v){ return (v||'').toString().toUpperCase().trim(); });
+          var idx = rowU.findIndex(function(v){ return v.includes('PLAKA'); });
+          if(idx >= 0){
+            hRow = ri;
+            rowU.forEach(function(v,ci){
+              if(v.includes('PLAKA')) cols.plaka = ci;
+              else if(v.includes('TİP')||v.includes('TIP')||v.includes('MODEL')) cols.tip = ci;
+              else if(v.includes('SİGORTA')||v.includes('SIGORTA')) cols.sigorta = ci;
+              else if(v.includes('MUAYENE')||v.includes('VİZE')||v.includes('VIZE')) cols.muayene = ci;
+              else if(v.includes('NOT')||v.includes('AÇIKLAMA')) cols.not = ci;
+            });
+          }
+        }
+        if(hRow < 0 || cols.plaka===undefined){ toast('❌ "PLAKA" sütunu bulunamadı','error'); return; }
+
+        function tarihCevir(tRaw){
+          if(tRaw instanceof Date && !isNaN(tRaw)) return tRaw.toISOString().split('T')[0];
+          if(typeof tRaw === 'number' && tRaw > 0 && window.XLSX && XLSX.SSF){
+            var p = XLSX.SSF.parse_date_code(tRaw);
+            if(p) return p.y+'-'+String(p.m).padStart(2,'0')+'-'+String(p.d).padStart(2,'0');
+          }
+          if(tRaw){
+            var s = tRaw.toString().trim();
+            var m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if(m) return m[0];
+            m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+            if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+          }
+          return '';
+        }
+
+        var list = _loadAraclar();
+        var added = 0, updated = 0;
+
+        for(var ri2=hRow+1; ri2<rows.length; ri2++){
+          var row = rows[ri2];
+          if(!row) continue;
+          var plaka = (row[cols.plaka]||'').toString().trim().toUpperCase();
+          if(!plaka) continue;
+
+          var sigorta = cols.sigorta!==undefined ? tarihCevir(row[cols.sigorta]) : '';
+          var muayene = cols.muayene!==undefined ? tarihCevir(row[cols.muayene]) : '';
+          var tip = cols.tip!==undefined ? (row[cols.tip]||'').toString().trim() : '';
+          var not_ = cols.not!==undefined ? (row[cols.not]||'').toString().trim() : '';
+
+          var existing = list.find(function(a){ return (a.plaka||'').toUpperCase()===plaka; });
+          if(existing){
+            if(tip) existing.tip = tip;
+            if(sigorta) existing.sigorta = sigorta;
+            if(muayene) existing.muayene = muayene;
+            if(not_) existing.not = not_;
+            existing.guncelleme = new Date().toISOString();
+            updated++;
+          } else {
+            list.push({id:Date.now().toString(36)+added, plaka:plaka, tip:tip, sigorta:sigorta, muayene:muayene, not:not_, guncelleme:new Date().toISOString()});
+            added++;
+          }
+        }
+
+        _saveAraclar(list);
+        if(typeof _atRenderListe==='function') _atRenderListe();
+        if(typeof _updateAracTakipOzet==='function') _updateAracTakipOzet();
+        toast('✅ '+added+' yeni araç eklendi'+(updated?', '+updated+' araç güncellendi':''), 'success');
+      }catch(err){
+        console.error('Araç Takip içe aktarma hatası:', err);
+        toast('❌ Excel okuma hatası: '+(err.message||'bilinmeyen'), 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 function _gunFark(t){if(!t)return null;var b=new Date();b.setHours(0,0,0,0);return Math.round((new Date(t)-b)/86400000);}
 function _durumBadge(g){
   if(g===null)return'<span style="color:rgba(255,255,255,.3)">—</span>';
@@ -17482,7 +17580,11 @@ function _openAracTakipEkran(){
             +'<div style="font-size:11px;color:rgba(255,255,255,.4);">Sigorta, Muayene & Giderler</div>'
           +'</div>'
         +'</div>'
+        +'<input type="file" id="at-import-file" accept=".xlsx,.xls" style="display:none;" onchange="_atImportExcel(event)">'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button onclick="document.getElementById(\'at-import-file\').click()" style="padding:9px 14px;border-radius:10px;border:1px solid rgba(45,212,191,.35);background:rgba(45,212,191,.1);color:#2dd4bf;font-size:12px;font-weight:700;cursor:pointer;">📥 Excel\'den İçe Aktar</button>'
         +'<button id="at-ekle-btn" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(14,165,233,.4);background:rgba(14,165,233,.1);color:#38bdf8;font-size:12px;font-weight:700;cursor:pointer;">+ Araç Ekle</button>'
+        +'</div>'
       +'</div>'
       +'<div style="display:flex;gap:0;padding:0 16px;">'
         +'<button id="at-tab-araclar" onclick="_atSwitchTab(this.dataset.tab)" data-tab="araclar" style="padding:10px 16px;border:none;background:transparent;color:#38bdf8;font-size:12px;font-weight:700;cursor:pointer;border-bottom:2px solid #38bdf8;font-family:Outfit,sans-serif;">🚌 Araçlar</button>'
