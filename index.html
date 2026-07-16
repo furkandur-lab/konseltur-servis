@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-39</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-40</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17498,6 +17498,17 @@ function _ggLoad(cb){
     if(raw) window._ggData = JSON.parse(raw)||{};
   }catch(e){ window._ggData = {}; }
   var reqTime = Date.now();
+  // KÖK SEBEP DÜZELTMESİ: cb (ekranı açan/yeniden oluşturan fonksiyon) daha önce
+  // Firebase dinleyicisi HER tetiklendiğinde çağrılıyordu — bu da kendi yazdığımız
+  // her kaydın yankısında (siz her yazıp 600ms beklediğinizde) TÜM EKRANIN sıfırdan
+  // yok silinip yeniden oluşturulmasına sebep oluyordu ("yazarken sayfa en üste
+  // sıçrıyor" hatasının gerçek kök nedeni buydu). Artık cb sadece BİR KEZ çağrılır.
+  var _cbCalled = false;
+  function _fireCbOnce(){
+    if(_cbCalled) return;
+    _cbCalled = true;
+    if(cb) cb();
+  }
   if(window._fbDb && window._fbRef && window._fbOnValue){
     if(window._fbGGUnsub){ try{ window._fbGGUnsub(); }catch(e){} }
     window._fbGGUnsub = window._fbOnValue(window._fbRef(window._fbDb,'konseltur/GLOBAL/gelir_gider'), function(snap){
@@ -17505,25 +17516,19 @@ function _ggLoad(cb){
       // Yarış durumu koruması: bu dinleyici kurulduktan SONRA yerel bir kayıt
       // yapıldıysa, gelen anlık görüntü muhtemelen eski/eksiktir — üzerine yazma
       // (bkz. Cari/Ödeme modüllerindeki aynı düzeltme)
-      if(_lastGGSaveAt > reqTime){ if(cb) cb(); return; }
+      if(_lastGGSaveAt > reqTime){ _fireCbOnce(); return; }
       if(snap && snap.exists()){
         var d = snap.val();
         if(d && typeof d==='object'){
           window._ggData = Object.assign({}, window._ggData, d);
           try{ localStorage.setItem(GG_KEY, JSON.stringify(window._ggData)); }catch(e){}
-          // KESİN ÇÖZÜM: Ekran açıkken uzaktan gelen veri ARTIK HİÇBİR KOŞULDA ekranı
-          // otomatik yeniden çizmez ("yazıyor mu" kontrolü zamanlamaya bağlıydı ve
-          // bazı durumları kaçırabiliyordu — bu daha önceki düzeltmelerin neden
-          // yetersiz kaldığıydı). Veri arka planda sessizce güncellenir; ekran bir
-          // sonraki doğal etkileşimde (ay değiştir, satır ekle/sil, ekranı kapatıp
-          // yeniden aç) kendiliğinden güncel halini gösterir. Yazarken kesinti YOK.
         }
       }
-      if(cb) cb();
-    }, function(){ window._ggFbSynced = true; if(cb) cb(); });
+      _fireCbOnce();
+    }, function(){ window._ggFbSynced = true; _fireCbOnce(); });
   } else {
     window._ggFbSynced = true;
-    if(cb) cb();
+    _fireCbOnce();
   }
 }
 
@@ -17607,33 +17612,6 @@ function _ggOpenEkran(){
     }, 150);
   });
 
-  // ── GEÇİCİ TEŞHİS KAYITLARI ──────────────────────────────
-  // Bildirilen "yazarken sayfa en üste kayıyor" hatasının kaynağını kesin olarak
-  // yakalamak için: her focus/blur ve her kaydırma olayını zaman damgasıyla loglar.
-  console.log('%c[GG-TEŞHİS] Ekran açıldı, izleme başladı', 'color:#22c55e;font-weight:bold;');
-  scr.addEventListener('focusin', function(e){
-    console.log('%c[GG-TEŞHİS] focusin →', 'color:#60a5fa;', e.target && e.target.id, e.target && e.target.value, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
-  });
-  scr.addEventListener('focusout', function(e){
-    console.log('%c[GG-TEŞHİS] focusout ←', 'color:#f87171;', e.target && e.target.id, e.target && e.target.value, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
-  });
-  scr.addEventListener('scroll', function(){
-    console.log('%c[GG-TEŞHİS] #gg-screen scroll →', 'color:#a78bfa;', 'scrollTop='+scr.scrollTop, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
-  });
-  window.removeEventListener('scroll', window._ggDiagWinScroll || function(){});
-  window._ggDiagWinScroll = function(){
-    console.log('%c[GG-TEŞHİS] window scroll →', 'color:#e879f9;', 'scrollY='+window.scrollY, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
-  };
-  window.addEventListener('scroll', window._ggDiagWinScroll);
-  document.removeEventListener('scroll', window._ggDiagDocScroll || function(){}, true);
-  window._ggDiagDocScroll = function(e){
-    if(e.target && e.target !== document && e.target.id !== 'gg-screen'){
-      console.log('%c[GG-TEŞHİS] BAŞKA bir eleman kaydı →', 'color:#facc15;font-weight:bold;', e.target.id||e.target.className||e.target.tagName, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
-    }
-  };
-  document.addEventListener('scroll', window._ggDiagDocScroll, true);
-  // ── TEŞHİS SONU ──────────────────────────────────────────
-
   _ggRenderAy();
 }
 
@@ -17683,8 +17661,6 @@ function _ggToplam(list){
 }
 
 function _ggRenderAy(){
-  console.log('%c[GG-TEŞHİS] _ggRenderAy çağrıldı', 'color:#f59e0b;font-weight:bold;', new Date().toLocaleTimeString());
-  console.trace();
   // Kaydırma konumunu koru — ekran yeniden çizilirken en üste sıçramasın
   var _scr = document.getElementById('gg-screen');
   var _scrollTop = _scr ? _scr.scrollTop : 0;
