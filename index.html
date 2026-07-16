@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-32</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-33</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17581,6 +17581,40 @@ function _ggClose(){
   if(scr) scr.parentNode.removeChild(scr);
 }
 
+function _ggFormatNum(raw){
+  var digits = (raw||'').toString().replace(/[^0-9]/g,'');
+  if(!digits) return '';
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// Sayı alanına yazarken binlik nokta ayracını canlı uygular, imleç konumunu korur
+function _ggOnAmountInput(el, ay, id, field){
+  var cursorPos = el.selectionStart;
+  var oldVal = el.value;
+  var digitsBeforeCursor = oldVal.slice(0, cursorPos).replace(/[^0-9]/g,'').length;
+  var digits = oldVal.replace(/[^0-9]/g,'');
+  var formatted = _ggFormatNum(digits);
+  el.value = formatted;
+  var count = 0, newPos = formatted.length;
+  if(digitsBeforeCursor === 0){ newPos = 0; }
+  else {
+    for(var i=0;i<formatted.length;i++){
+      if(/[0-9]/.test(formatted[i])) count++;
+      if(count === digitsBeforeCursor){ newPos = i+1; break; }
+    }
+  }
+  el.setSelectionRange(newPos, newPos);
+  _ggField(ay, id, field, digits);
+}
+
+function _ggNetOf(r){ return Number(r.gelir||0) - Number(r.gider||0); }
+
+function _ggToplam(list){
+  var g=0, gd=0;
+  list.forEach(function(r){ g += Number(r.gelir||0); gd += Number(r.gider||0); });
+  return { gelir:g, gider:gd, net:g-gd };
+}
+
 function _ggRenderAy(){
   var ay = window._ggActiveAy;
   var nav = document.getElementById('gg-month-nav');
@@ -17595,12 +17629,7 @@ function _ggRenderAy(){
   var hesaplar = Object.values(data).filter(function(r){ return r.grup !== 'servis'; }).sort(function(a,b){ return (a.ts||0)-(b.ts||0); });
   var servisler = Object.values(data).filter(function(r){ return r.grup === 'servis'; }).sort(function(a,b){ return (a.ts||0)-(b.ts||0); });
 
-  function toplam(list){
-    var g=0, gd=0;
-    list.forEach(function(r){ g += Number(r.gelir||0); gd += Number(r.gider||0); });
-    return { gelir:g, gider:gd, net:g-gd };
-  }
-  var tH = toplam(hesaplar), tS = toplam(servisler);
+  var tH = _ggToplam(hesaplar), tS = _ggToplam(servisler);
   var tAll = { gelir: tH.gelir+tS.gelir, gider: tH.gider+tS.gider, net: tH.net+tS.net };
 
   var totalsEl = document.getElementById('gg-totals');
@@ -17609,55 +17638,88 @@ function _ggRenderAy(){
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">'
         +'<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:12px;padding:14px;text-align:center;">'
           +'<div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;">TOPLAM GELİR</div>'
-          +'<div style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:#4ade80;">₺'+tAll.gelir.toLocaleString('tr-TR')+'</div>'
+          +'<div id="gg-tot-gelir" style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:#4ade80;">₺'+tAll.gelir.toLocaleString('tr-TR')+'</div>'
         +'</div>'
         +'<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:14px;text-align:center;">'
           +'<div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;">TOPLAM GİDER</div>'
-          +'<div style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:#f87171;">₺'+tAll.gider.toLocaleString('tr-TR')+'</div>'
+          +'<div id="gg-tot-gider" style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:#f87171;">₺'+tAll.gider.toLocaleString('tr-TR')+'</div>'
         +'</div>'
         +'<div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:12px;padding:14px;text-align:center;">'
           +'<div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;">NET</div>'
-          +'<div style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:'+(tAll.net>=0?'#60a5fa':'#f87171')+';">₺'+tAll.net.toLocaleString('tr-TR')+'</div>'
+          +'<div id="gg-tot-net" style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:'+(tAll.net>=0?'#60a5fa':'#f87171')+';">₺'+tAll.net.toLocaleString('tr-TR')+'</div>'
         +'</div>'
       +'</div>';
   }
 
-  function tabloHtml(baslik, list, grup, tp){
+  // grup: 'hesap' → tek alan (Gelir, yeşil) · 'servis' → tek alan (Gider, kırmızı)
+  function tabloHtml(baslik, list, grup, tp, alanAdi, alanRengi){
     var rowsHtml = list.map(function(r){
-      var net = Number(r.gelir||0) - Number(r.gider||0);
-      return '<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);">'
+      var net = _ggNetOf(r);
+      var deger = grup==='servis' ? (r.gider||0) : (r.gelir||0);
+      return '<div id="gg-row-'+r.id+'" style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);">'
         +'<input value="'+escHtml(r.isim||'')+'" placeholder="Hesap adı" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'isim\',this.value)" style="flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:7px 9px;color:#fff;font-size:12px;">'
-        +'<input type="number" value="'+(r.gelir||'')+'" placeholder="Gelir" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'gelir\',this.value)" style="width:90px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:7px;padding:7px 9px;color:#4ade80;font-size:12px;">'
-        +'<input type="number" value="'+(r.gider||'')+'" placeholder="Gider" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'gider\',this.value)" style="width:90px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:7px;padding:7px 9px;color:#f87171;font-size:12px;">'
-        +'<div style="width:80px;text-align:right;font-size:12px;font-weight:700;color:'+(net>=0?'#60a5fa':'#f87171')+';">₺'+net.toLocaleString('tr-TR')+'</div>'
+        +'<input type="text" inputmode="numeric" value="'+_ggFormatNum(deger)+'" placeholder="'+alanAdi+'" oninput="_ggOnAmountInput(this,\''+ay+'\',\''+r.id+'\',\''+(grup==='servis'?'gider':'gelir')+'\')" style="width:110px;background:'+alanRengi.bg+';border:1px solid '+alanRengi.border+';border-radius:7px;padding:7px 9px;color:'+alanRengi.text+';font-size:12px;text-align:right;">'
+        +'<div id="gg-net-'+r.id+'" style="width:90px;text-align:right;font-size:12px;font-weight:700;color:'+(net>=0?'#60a5fa':'#f87171')+';">₺'+_ggFormatNum(Math.abs(net))+(net<0?' -':'')+'</div>'
         +'<button onclick="_ggDeleteRow(\''+ay+'\',\''+r.id+'\')" style="width:28px;height:28px;flex-shrink:0;border-radius:7px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:#f87171;cursor:pointer;font-size:14px;">×</button>'
       +'</div>';
     }).join('');
     return '<div style="background:#0e1420;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:16px;margin-bottom:14px;">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
         +'<div style="font-family:Syne,sans-serif;font-size:13px;font-weight:800;color:#fff;">'+baslik+'</div>'
-        +'<div style="font-size:11px;color:rgba(255,255,255,.35);">Gelir ₺'+tp.gelir.toLocaleString('tr-TR')+' · Gider ₺'+tp.gider.toLocaleString('tr-TR')+' · Net ₺'+tp.net.toLocaleString('tr-TR')+'</div>'
+        +'<div id="gg-sub-'+grup+'" style="font-size:11px;color:rgba(255,255,255,.35);">Toplam '+alanAdi+' ₺'+tp[grup==='servis'?'gider':'gelir'].toLocaleString('tr-TR')+'</div>'
       +'</div>'
-      +(rowsHtml || '<div style="text-align:center;padding:20px;color:rgba(255,255,255,.25);font-size:12px;">Henüz kayıt yok.</div>')
+      +'<div id="gg-rows-'+grup+'">'+(rowsHtml || '<div style="text-align:center;padding:20px;color:rgba(255,255,255,.25);font-size:12px;">Henüz kayıt yok.</div>')+'</div>'
       +'<button onclick="_ggAddRow(\''+ay+'\',\''+grup+'\')" style="margin-top:10px;width:100%;padding:8px;border-radius:8px;border:1px dashed rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.4);font-size:12px;cursor:pointer;">+ Satır Ekle</button>'
     +'</div>';
   }
 
   var body = document.getElementById('gg-body');
   if(body){
-    body.innerHTML = tabloHtml('📋 Hesaplar', hesaplar, 'hesap', tH) + tabloHtml('🚌 Servisciler / Personel', servisler, 'servis', tS);
+    body.innerHTML =
+      tabloHtml('📋 Hesaplar', hesaplar, 'hesap', tH, 'Gelir', {bg:'rgba(34,197,94,.06)', border:'rgba(34,197,94,.15)', text:'#4ade80'})
+      + tabloHtml('🚌 Servisciler / Personel', servisler, 'servis', tS, 'Gider', {bg:'rgba(239,68,68,.06)', border:'rgba(239,68,68,.15)', text:'#f87171'});
   }
 }
 
 let _ggSaveTimer = null;
+// Yazarken tüm listeyi yeniden çizip input odağını kaybettirmemek için:
+// veri modelini anında güncelle, sadece ilgili net/toplam hücrelerini DOM'da
+// doğrudan güncelle, kayıt işlemini (localStorage+Firebase) geciktir (debounce).
+// _ggRenderAy() burada ASLA çağrılmaz — çağrılırsa kullanıcı yazarken input
+// yeniden oluşturulur ve imleç/odak kaybolur (bildirilen hata tam olarak buydu).
 function _ggField(ay, id, field, value){
   if(!window._ggData[ay]) window._ggData[ay] = {};
   if(!window._ggData[ay][id]) window._ggData[ay][id] = {id:id, isim:'', gelir:0, gider:0, grup:'hesap', ts:Date.now()};
-  window._ggData[ay][id][field] = (field==='gelir'||field==='gider') ? (Number(value)||0) : value;
-  // Toplamlar/net anlık güncellensin ama her tuşta tüm listeyi yeniden çizip
-  // input focus'unu kaybettirmeyelim — sadece kaydetmeyi geciktir (debounce)
+  var rec = window._ggData[ay][id];
+  rec[field] = (field==='gelir'||field==='gider') ? (Number(value)||0) : value;
+
+  // Bu satırın net değerini anında güncelle
+  var netEl = document.getElementById('gg-net-'+id);
+  if(netEl){
+    var net = _ggNetOf(rec);
+    netEl.style.color = net>=0 ? '#60a5fa' : '#f87171';
+    netEl.textContent = '₺'+_ggFormatNum(Math.abs(net))+(net<0?' -':'');
+  }
+
+  // Bölüm toplamlarını ve genel toplamları anında güncelle
+  var data = window._ggData[ay] || {};
+  var hesaplar = Object.values(data).filter(function(r){ return r.grup !== 'servis'; });
+  var servisler = Object.values(data).filter(function(r){ return r.grup === 'servis'; });
+  var tH = _ggToplam(hesaplar), tS = _ggToplam(servisler);
+  var tAll = { gelir: tH.gelir+tS.gelir, gider: tH.gider+tS.gider };
+  var subH = document.getElementById('gg-sub-hesap'); if(subH) subH.textContent = 'Toplam Gelir ₺'+tH.gelir.toLocaleString('tr-TR');
+  var subS = document.getElementById('gg-sub-servis'); if(subS) subS.textContent = 'Toplam Gider ₺'+tS.gider.toLocaleString('tr-TR');
+  var totG = document.getElementById('gg-tot-gelir'); if(totG) totG.textContent = '₺'+tAll.gelir.toLocaleString('tr-TR');
+  var totGd = document.getElementById('gg-tot-gider'); if(totGd) totGd.textContent = '₺'+tAll.gider.toLocaleString('tr-TR');
+  var totN = document.getElementById('gg-tot-net');
+  if(totN){
+    var net2 = tAll.gelir - tAll.gider;
+    totN.style.color = net2>=0 ? '#60a5fa' : '#f87171';
+    totN.textContent = '₺'+net2.toLocaleString('tr-TR');
+  }
+
   clearTimeout(_ggSaveTimer);
-  _ggSaveTimer = setTimeout(function(){ _ggSave(); _ggRenderAy(); }, 600);
+  _ggSaveTimer = setTimeout(function(){ _ggSave(); }, 600);
 }
 
 function _ggAddRow(ay, grup){
