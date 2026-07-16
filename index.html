@@ -1589,7 +1589,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-48</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-49</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17447,33 +17447,41 @@ function _atImportExcel(event){
       try{
         var data = new Uint8Array(e.target.result);
         var workbook = XLSX.read(data, {type:'array', cellDates:true});
-        var sheetName = workbook.SheetNames.find(function(sn){
-          var u = sn.toUpperCase();
-          return u.includes('ARAÇ') || u.includes('ARAC') || u.includes('SİGORTA') || u.includes('VİZE') || u.includes('MUAYENE');
-        }) || workbook.SheetNames[0];
-        var ws = workbook.Sheets[sheetName];
-        // raw:true — cellDates:true ile tarih hücreleri gerçek Date nesnesi olarak gelsin
-        // (raw:false kullanılsaydı İş Başvuruları'nda yaşadığımız "tarihler aktarılmıyor"
-        // hatası burada da tekrarlanırdı)
-        var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
-        if(!rows || rows.length < 2){ toast('❌ Sekme boş görünüyor','error'); return; }
 
-        let hRow = -1, cols = {};
-        for(var ri=0; ri<Math.min(6, rows.length); ri++){
-          var rowU = (rows[ri]||[]).map(function(v){ return (v||'').toString().toUpperCase().trim(); });
-          var idx = rowU.findIndex(function(v){ return v.includes('PLAKA'); });
-          if(idx >= 0){
-            hRow = ri;
-            rowU.forEach(function(v,ci){
-              if(v.includes('PLAKA')) cols.plaka = ci;
-              else if(v.includes('TİP')||v.includes('TIP')||v.includes('MODEL')) cols.tip = ci;
-              else if(v.includes('SİGORTA')||v.includes('SIGORTA')) cols.sigorta = ci;
-              else if(v.includes('MUAYENE')||v.includes('VİZE')||v.includes('VIZE')) cols.muayene = ci;
-              else if(v.includes('NOT')||v.includes('AÇIKLAMA')) cols.not = ci;
-            });
+        // Doğru sayfayı BULMAK için sayfa ADINA değil, İÇERİĞİNE bakıyoruz —
+        // "PLAKA" başlığını içeren ilk sayfayı seçiyoruz. Sayfa adına güvenmek
+        // yanıltıcı olabiliyor (örn. asıl veri "Sheet1" gibi genel bir isimde
+        // dururken, kullanılmayan bir yedek liste "ARAÇ TAKİP" gibi anlamlı bir
+        // isim taşıyabiliyor — bu dosyada tam olarak bu durumla karşılaştık).
+        var hRow = -1, cols = {}, rows = null;
+        for(var si=0; si<workbook.SheetNames.length; si++){
+          var wsTry = workbook.Sheets[workbook.SheetNames[si]];
+          var rowsTry = XLSX.utils.sheet_to_json(wsTry, {header:1, defval:null, raw:true});
+          if(!rowsTry || rowsTry.length < 2) continue;
+          for(var ri=0; ri<Math.min(6, rowsTry.length); ri++){
+            var rowU = (rowsTry[ri]||[]).map(function(v){ return (v||'').toString().toUpperCase().trim(); });
+            if(rowU.some(function(v){ return v==='PLAKA'||v.includes('PLAKA'); })){
+              hRow = ri; rows = rowsTry;
+              rowU.forEach(function(v,ci){
+                if(v.includes('PLAKA')) cols.plaka = ci;
+                else if(v.includes('VİZE')||v.includes('VIZE')||v.includes('MUAYENE')) cols.muayene = ci;
+                else if(v.includes('SİGORTA')||v.includes('SIGORTA')) cols.sigorta = ci;
+                else if(v.includes('TİP')||v.includes('TIP')||v.includes('MODEL')) cols.tip = ci;
+                else if(v.includes('FİRMA')||v.includes('FIRMA')) cols.firma = ci;
+                else if(v.includes('SÜRÜCÜ')||v.includes('SURUCU')) cols.surucu = ci;
+                else if(v==='UTTS') cols.utts = ci;
+                else if(v.includes('YAKIT')) cols.yakit = ci;
+                else if(v.includes('ARAÇ TAKİP')||v.includes('ARAC TAKIP')) cols.araçtakip = ci;
+                else if(v.includes('İMM')||v.includes('IMM')) cols.imm = ci;
+                else if(v.includes('KASKO')) cols.kasko = ci;
+                else if(v.includes('NOT')||v.includes('AÇIKLAMA')) cols.not = ci;
+              });
+              break;
+            }
           }
+          if(hRow >= 0) break; // uygun sayfa bulundu, aramayı durdur
         }
-        if(hRow < 0 || cols.plaka===undefined){ toast('❌ "PLAKA" sütunu bulunamadı','error'); return; }
+        if(hRow < 0 || cols.plaka===undefined){ toast('❌ "PLAKA" sütunu içeren bir sayfa bulunamadı','error'); return; }
 
         function tarihCevir(tRaw){
           if(tRaw instanceof Date && !isNaN(tRaw)) return tRaw.toISOString().split('T')[0];
@@ -17490,6 +17498,9 @@ function _atImportExcel(event){
           }
           return '';
         }
+        function hucre(row, key){
+          return cols[key]!==undefined ? (row[cols[key]]||'').toString().trim() : '';
+        }
 
         var list = _loadAraclar();
         var added = 0, updated = 0;
@@ -17502,8 +17513,21 @@ function _atImportExcel(event){
 
           var sigorta = cols.sigorta!==undefined ? tarihCevir(row[cols.sigorta]) : '';
           var muayene = cols.muayene!==undefined ? tarihCevir(row[cols.muayene]) : '';
-          var tip = cols.tip!==undefined ? (row[cols.tip]||'').toString().trim() : '';
-          var not_ = cols.not!==undefined ? (row[cols.not]||'').toString().trim() : '';
+          var tip = hucre(row,'tip');
+          var not_ = hucre(row,'not');
+
+          // Uygulamanın araç kaydında yeri olmayan ek bilgileri (Firma, Sürücü,
+          // UTTS, Yakıt Kartı, Araç Takip No, İMM, Kasko) Notlar'a ekliyoruz —
+          // hiçbir bilgi kaybolmasın diye
+          var extra = [];
+          var firma = hucre(row,'firma'); if(firma) extra.push('Firma: '+firma);
+          var surucu = hucre(row,'surucu'); if(surucu) extra.push('Sürücü: '+surucu);
+          var utts = hucre(row,'utts'); if(utts) extra.push('UTTS: '+utts);
+          var yakit = hucre(row,'yakit'); if(yakit) extra.push('Yakıt Kartı: '+yakit);
+          var atNo = hucre(row,'araçtakip'); if(atNo) extra.push('Araç Takip No: '+atNo);
+          var imm = hucre(row,'imm'); if(imm) extra.push('İMM: '+imm);
+          var kasko = hucre(row,'kasko'); if(kasko) extra.push('Kasko: '+kasko);
+          if(extra.length) not_ = (not_ ? not_+' · ' : '') + extra.join(' · ');
 
           var existing = list.find(function(a){ return (a.plaka||'').toUpperCase()===plaka; });
           if(existing){
