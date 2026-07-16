@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-35</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-37</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17507,7 +17507,7 @@ function _ggLoad(cb){
           // veri zaten güncellendi, ekran bir sonraki doğal etkileşimde (satır ekle/sil,
           // ay değiştir vb.) kendiliğinden güncel halini gösterecek.
           var _aktif = document.activeElement;
-          var _yaziyor = _aktif && _aktif.tagName === 'INPUT' && _aktif.closest && _aktif.closest('#gg-body');
+          var _yaziyor = window._ggIsEditing || (_aktif && _aktif.tagName === 'INPUT' && _aktif.closest && _aktif.closest('#gg-body'));
           if(!_yaziyor && document.getElementById('gg-screen') && window._ggActiveAy) _ggRenderAy();
         }
       }
@@ -17582,6 +17582,22 @@ function _ggOpenEkran(){
       +'<div id="gg-body"></div>'
     +'</div>';
   document.body.appendChild(scr);
+  // Odak takibi (event delegation): kullanıcı bir gg alanına yazarken/odaklanmışken
+  // bunu sürekli izler — Firebase'den gecikmeli veri gelirse ekranı o an yeniden
+  // çizmemek için bu bayrağa güvenilir (tek anlık document.activeElement kontrolünden
+  // daha sağlam, çünkü focusout/focusin olayları güvenilir şekilde yakalanır)
+  window._ggIsEditing = false;
+  scr.addEventListener('focusin', function(e){
+    if(e.target && e.target.tagName === 'INPUT') window._ggIsEditing = true;
+  });
+  scr.addEventListener('focusout', function(){
+    // Kısa bir gecikmeyle kapat — aynı satırdaki başka bir alana geçerken
+    // (isim → tutar gibi) yanlışlıkla "düzenleme bitti" sayılmasın
+    setTimeout(function(){
+      var a = document.activeElement;
+      if(!a || !a.closest || !a.closest('#gg-screen')) window._ggIsEditing = false;
+    }, 150);
+  });
   _ggRenderAy();
 }
 
@@ -17631,7 +17647,12 @@ function _ggToplam(list){
 }
 
 function _ggRenderAy(){
+  // Kaydırma konumunu koru — ekran yeniden çizilirken en üste sıçramasın
+  var _scr = document.getElementById('gg-screen');
+  var _scrollTop = _scr ? _scr.scrollTop : 0;
+
   var ay = window._ggActiveAy;
+  _ggSeedSablonlar(ay); // bu ayda henüz olmayan kalıcı maddeleri (varsa) ekle
   var nav = document.getElementById('gg-month-nav');
   if(nav){
     nav.innerHTML =
@@ -17694,6 +17715,9 @@ function _ggRenderAy(){
       tabloHtml('📋 Gelir <span style="font-weight:400;color:rgba(255,255,255,.3);">(Hesaplar)</span>', hesaplar, 'hesap', tH, 'Gelir', {bg:'rgba(34,197,94,.06)', border:'rgba(34,197,94,.15)', text:'#4ade80'})
       + tabloHtml('🚌 Gider <span style="font-weight:400;color:rgba(255,255,255,.3);">(Servisciler / Personel)</span>', servisler, 'servis', tS, 'Gider', {bg:'rgba(239,68,68,.06)', border:'rgba(239,68,68,.15)', text:'#f87171'});
   }
+
+  // Kaydırma konumunu geri yükle
+  if(_scr) _scr.scrollTop = _scrollTop;
 }
 
 let _ggSaveTimer = null;
@@ -17708,6 +17732,9 @@ function _ggField(ay, id, field, value){
   if(!window._ggData[ay][id]) window._ggData[ay][id] = {id:id, isim:'', gelir:0, gider:0, grup:'hesap', ts:Date.now()};
   var rec = window._ggData[ay][id];
   rec[field] = (field==='gelir'||field==='gider') ? (Number(value)||0) : value;
+  // İsim değiştiyse ve bu satır bir kalıcı maddeye bağlıysa, şablondaki adı da güncelle
+  // (böylece henüz görmediğiniz gelecek aylarda da güncel isimle görünür)
+  if(field==='isim' && rec.templateId){ _ggSablonGuncelle(rec.templateId, value); }
 
   // Bu satırın net değerini anında güncelle
   var netEl = document.getElementById('gg-net-'+id);
@@ -17741,17 +17768,63 @@ function _ggField(ay, id, field, value){
  }
 }
 
+// ── Kalıcı Madde (Şablon) Sistemi ──
+// "+ Satır Ekle" ile eklenen her madde otomatik olarak "_sablon" listesine kaydedilir.
+// Herhangi bir ay görüntülendiğinde, o ayda henüz bulunmayan şablon maddeleri
+// otomatik olarak (isim dolu, tutar boş) eklenir — böylece kullanıcı her ay aynı
+// hesap/personel isimlerini yeniden yazmak zorunda kalmaz.
+// NOT: Excel'den toplu içe aktarılan geçmiş kayıtlar şablona dahil edilmez (sadece
+// "+ Satır Ekle" ile elle eklenen maddeler kalıcı hale gelir) — aksi halde 100'ü
+// aşkın geçmiş kayıt aniden "her ay tekrar eden madde" haline gelirdi.
+function _ggSablonEkle(isim, grup){
+  if(!window._ggData['_sablon']) window._ggData['_sablon'] = {};
+  var tid = 'tpl_' + Date.now().toString(36) + Math.random().toString(36).substr(2,4);
+  window._ggData['_sablon'][tid] = {id:tid, isim:isim||'', grup:grup, ts:Date.now()};
+  return tid;
+}
+
+function _ggSablonGuncelle(tid, isim){
+  if(!tid || !window._ggData['_sablon'] || !window._ggData['_sablon'][tid]) return;
+  window._ggData['_sablon'][tid].isim = isim;
+}
+
+// Bir ayı görüntülerken, o ayda henüz olmayan şablon maddelerini (boş tutarla) ekler
+function _ggSeedSablonlar(ay){
+  var sablon = window._ggData['_sablon'] || {};
+  var mevcut = window._ggData[ay] || {};
+  var mevcutTidler = {};
+  Object.values(mevcut).forEach(function(r){ if(r.templateId) mevcutTidler[r.templateId] = true; });
+  var eklendi = false;
+  Object.values(sablon).forEach(function(t){
+    if(!t.isim) return; // henüz isimsiz (yeni oluşturulmuş, kullanıcı yazıyor) şablonları erken ekleme
+    if(mevcutTidler[t.id]) return; // bu ay zaten var
+    var rid = 'gg_' + Date.now().toString(36) + Math.random().toString(36).substr(2,4) + Math.floor(Math.random()*1000);
+    if(!window._ggData[ay]) window._ggData[ay] = {};
+    window._ggData[ay][rid] = {id:rid, isim:t.isim, gelir:0, gider:0, grup:t.grup, templateId:t.id, ts:t.ts};
+    eklendi = true;
+  });
+  if(eklendi){ try{ localStorage.setItem(GG_KEY, JSON.stringify(window._ggData)); }catch(e){} _ggSave(); }
+}
+
 function _ggAddRow(ay, grup){
   if(!window._ggData[ay]) window._ggData[ay] = {};
   var id = 'gg_' + Date.now().toString(36) + Math.random().toString(36).substr(2,4);
-  window._ggData[ay][id] = {id:id, isim:'', gelir:0, gider:0, grup:grup, ts:Date.now()};
+  var tid = _ggSablonEkle('', grup); // kalıcı madde olarak da kaydet (isim henüz boş)
+  window._ggData[ay][id] = {id:id, isim:'', gelir:0, gider:0, grup:grup, templateId:tid, ts:Date.now()};
   _ggSave();
   _ggRenderAy();
 }
 
 function _ggDeleteRow(ay, id){
   if(!window._ggData[ay] || !window._ggData[ay][id]) return;
-  if(!confirm('Bu satırı silmek istediğinize emin misiniz?')) return;
+  var rec = window._ggData[ay][id];
+  var mesaj = rec.templateId
+    ? 'Bu madde her ay tekrar eden kalıcı listeden de kaldırılacak (gelecek aylarda artık görünmeyecek). Devam edilsin mi?'
+    : 'Bu satırı silmek istediğinize emin misiniz?';
+  if(!confirm(mesaj)) return;
+  if(rec.templateId && window._ggData['_sablon']){
+    delete window._ggData['_sablon'][rec.templateId];
+  }
   delete window._ggData[ay][id];
   _ggSave();
   _ggRenderAy();
@@ -17760,7 +17833,7 @@ function _ggDeleteRow(ay, id){
 function _ggExportExcel(){
   _ensureXLSX(function(){
     var wb = XLSX.utils.book_new();
-    var aylar = Object.keys(window._ggData).sort();
+    var aylar = Object.keys(window._ggData).filter(function(k){ return k !== '_sablon'; }).sort();
     if(!aylar.length){ toast('Dışa aktarılacak veri yok','error'); return; }
     aylar.forEach(function(ay){
       var data = window._ggData[ay] || {};
