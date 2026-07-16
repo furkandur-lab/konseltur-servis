@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-41</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-42</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -3617,6 +3617,7 @@ setInterval(updateLoginClock, 30000);
     <div class="filter-chip" onclick="filterCari('personel',this)" style="border-color:rgba(139,92,246,.3);color:var(--purple);">Personeller</div>
     <div class="filter-chip" onclick="filterCari('taseron',this)" style="border-color:rgba(245,158,11,.3);color:#fbbf24;">Taşeronlar</div>
     <div class="filter-chip" onclick="filterCari('firma',this)" style="border-color:rgba(59,130,246,.3);color:#60a5fa;">Firmalar</div>
+    <div class="filter-chip" onclick="filterCari('okul',this)" style="border-color:rgba(74,222,128,.3);color:var(--green);">🏫 Okullar</div>
     <div class="filter-chip" onclick="filterCari('diger',this)" style="border-color:rgba(255,255,255,.1);color:var(--muted2);">Diğer</div>
     <div class="filter-chip" onclick="filterCari('arsiv',this)" style="border-color:rgba(148,163,184,.3);color:#94a3b8;">📦 Arşiv</div>
   </div>
@@ -14176,7 +14177,8 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="field" id="cm-tur-field"><label>Cari Türü</label>
         <select id="cm-tur" onchange="_toggleCariYovmiye(this.value)">
           <!-- başvuru tipi kaldırıldı - İş Başvuruları modali kullanılıyor -->
-          <option value="firma">Firma / Okul</option>
+          <option value="firma">Firma</option>
+          <option value="okul">Okul Hesabı</option>
           <option value="personel">Personel</option>
           <option value="taseron">Taşeron</option>
           <option value="diger">Diğer</option>
@@ -14538,7 +14540,8 @@ function renderCariListe(){
   if(_cariFilter==='kasa') filtered = entries.filter(c=>c.tur==='kasa' && c.arsiv!==true);
   else if(_cariFilter==='personel') filtered = entries.filter(c=>(c.tur==='personel'||c.tur==='sofor') && c.arsiv!==true);
   else if(_cariFilter==='taseron') filtered = entries.filter(c=>c.tur==='taseron' && c.arsiv!==true);
-  else if(_cariFilter==='firma') filtered = entries.filter(c=>(c.tur==='firma'||c.tur==='okul') && c.arsiv!==true);
+  else if(_cariFilter==='firma') filtered = entries.filter(c=>c.tur==='firma' && c.arsiv!==true);
+  else if(_cariFilter==='okul') filtered = entries.filter(c=>c.tur==='okul' && c.arsiv!==true);
   else if(_cariFilter==='basvuru') filtered = entries.filter(c=>c.tur==='basvuru' && c.arsiv!==true);
   else if(_cariFilter==='diger') filtered = entries.filter(c=>c.tur!=='sofor'&&c.tur!=='taseron'&&c.tur!=='personel'&&c.tur!=='firma'&&c.tur!=='okul'&&c.tur!=='kasa' && c.arsiv!==true);
 
@@ -14577,8 +14580,8 @@ function renderCariListe(){
     return;
   }
 
-  const turLabel = {kasa:'Kasa',basvuru:'Başvuru',sofor:'Personel',taseron:'Taşeron',okul:'Firma/Okul',firma:'Firma/Okul',personel:'Personel',diger:'Diğer'};
-  const turColor = {kasa:'#fbbf24',sofor:'#a78bfa',taseron:'#f59e0b',okul:'#60a5fa',firma:'#60a5fa',personel:'#4ade80',basvuru:'#fb923c',diger:'var(--muted2)'};
+  const turLabel = {kasa:'Kasa',basvuru:'Başvuru',sofor:'Personel',taseron:'Taşeron',okul:'Okul Hesabı',firma:'Firma',personel:'Personel',diger:'Diğer'};
+  const turColor = {kasa:'#fbbf24',sofor:'#a78bfa',taseron:'#f59e0b',okul:'#4ade80',firma:'#60a5fa',personel:'#4ade80',basvuru:'#fb923c',diger:'var(--muted2)'};
   const turIcon = {kasa:'💰',sofor:'👤',taseron:'🚌',okul:'🏫',firma:'🏢',personel:'👤',basvuru:'📋',diger:'📋'};
 
   let html = '';
@@ -14682,7 +14685,7 @@ function renderCariDetay(id){
   }
   const c = _cariData[id];
   const calc = _cariCalcBakiye(c);
-  const turLabel = {kasa:'Kasa',basvuru:'Başvuru',sofor:'Personel',taseron:'Taşeron',okul:'Firma/Okul',firma:'Firma/Okul',personel:'Personel',diger:'Diğer'};
+  const turLabel = {kasa:'Kasa',basvuru:'Başvuru',sofor:'Personel',taseron:'Taşeron',okul:'Okul Hesabı',firma:'Firma',personel:'Personel',diger:'Diğer'};
 
   _setText('cdet-name', c.isim||'İsimsiz');
   let _detAlt = (turLabel[c.tur]||'Diğer') + (c.plaka?' • '+c.plaka:'') + (c.servis?' • Servis: '+c.servis:'');
@@ -16000,7 +16003,7 @@ function exportCariDetayPDF(){
   const c = _cariData[id];
   const calc = _cariCalcBakiye(c);
   const today = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'});
-  const turLabel = {kasa:'Kasa',basvuru:'Başvuru',sofor:'Personel',taseron:'Taşeron',okul:'Firma/Okul',firma:'Firma/Okul',personel:'Personel',diger:'Diğer'};
+  const turLabel = {kasa:'Kasa',basvuru:'Başvuru',sofor:'Personel',taseron:'Taşeron',okul:'Okul Hesabı',firma:'Firma',personel:'Personel',diger:'Diğer'};
   const tur = turLabel[c.tur]||c.tur||'Diğer';
 
   // Hareketler tablosu
