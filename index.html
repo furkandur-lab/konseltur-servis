@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-28</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-29</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -14787,10 +14787,12 @@ function renderCariDetay(id){
   let runBal = 0;
   const sorted = [...hareketler].sort((a,b)=>{
     const ta = a.tarih||'', tb = b.tarih||'';
-    if(ta && tb) return ta.localeCompare(tb);
-    if(ta && !tb) return -1;
-    if(!ta && tb) return 1;
-    return (a.ts||0) - (b.ts||0);  // tarih yoksa insert sırasına göre
+    // İkisi de tarihliyse ve tarihler farklıysa takvime göre sırala.
+    // Aksi halde (biri veya ikisi tarihsizse, ya da tarihler eşitse) eklenme/satır
+    // sırasına (ts) göre sırala — böylece tarihsiz Excel satırları listenin başına
+    // sıçramaz, orijinal sırasındaki komşularının arasında kalır.
+    if(ta && tb && ta !== tb) return ta.localeCompare(tb);
+    return (a.ts||0) - (b.ts||0);
   });
   sorted.forEach(h=>{ runBal += (parseFloat(h.borc||0) - parseFloat(h.alacak||0)); h._rb = runBal; });
   sorted.reverse();
@@ -14852,9 +14854,7 @@ function _renderSadecaHareketList(id){
   let runBal = 0;
   const sorted = [...hareketler].sort((a,b)=>{
     const ta=a.tarih||'', tb=b.tarih||'';
-    if(ta&&tb) return ta.localeCompare(tb);
-    if(ta&&!tb) return -1;
-    if(!ta&&tb) return 1;
+    if(ta && tb && ta !== tb) return ta.localeCompare(tb);
     return (a.ts||0)-(b.ts||0);
   });
   sorted.forEach(h=>{ runBal+=(parseFloat(h.borc||0)-parseFloat(h.alacak||0)); h._rb=runBal; });
@@ -16679,7 +16679,11 @@ function exportCariExcel(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(genelRows), 'GENEL LİSTE');
   entries.forEach(([id,c],i)=>{
-    const har=Object.values(c.hareketler||{}); har.sort((a,b)=>(a.tarih||'').localeCompare(b.tarih||''));
+    const har=Object.values(c.hareketler||{}); har.sort((a,b)=>{
+      const ta=a.tarih||'', tb=b.tarih||'';
+      if(ta && tb && ta !== tb) return ta.localeCompare(tb);
+      return (a.ts||0)-(b.ts||0);
+    });
     const rows=[['CARİ: '+(c.isim||'')],['SR.NO','TARİH','AÇIKLAMA','ALINAN','VERİLEN','BAKİYE']];
     let bal=0; har.forEach((h,j)=>{ const b=parseFloat(h.borc||0),a=parseFloat(h.alacak||0); bal+=(b-a); rows.push([j+1,h.tarih||'',h.aciklama||'',b,a,bal]); });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), String(i+1).substring(0,30));
