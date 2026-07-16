@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-33</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-34</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17499,7 +17499,16 @@ function _ggLoad(cb){
         if(d && typeof d==='object'){
           window._ggData = Object.assign({}, window._ggData, d);
           try{ localStorage.setItem(GG_KEY, JSON.stringify(window._ggData)); }catch(e){}
-          if(document.getElementById('gg-screen') && window._ggActiveAy) _ggRenderAy();
+          // ÖNEMLİ: İlk gerçek Firebase senkronizasyonu ağ gecikmesiyle (bazen 1-2 saniye)
+          // gelir. Kullanıcı modal açılır açılmaz yazmaya başlarsa, bu gecikmeli veri tam
+          // o sırada gelip listeyi yeniden çizerek yazdığı kutunun odağını kaybettirebilir
+          // ("biraz bekleyince yazamıyorum" hatası buydu — debounce'tan değil, buradan
+          // kaynaklanıyordu). Kullanıcı o an bir gg alanına yazıyorsa, ekranı yeniden çizme;
+          // veri zaten güncellendi, ekran bir sonraki doğal etkileşimde (satır ekle/sil,
+          // ay değiştir vb.) kendiliğinden güncel halini gösterecek.
+          var _aktif = document.activeElement;
+          var _yaziyor = _aktif && _aktif.tagName === 'INPUT' && _aktif.closest && _aktif.closest('#gg-body');
+          if(!_yaziyor && document.getElementById('gg-screen') && window._ggActiveAy) _ggRenderAy();
         }
       }
       if(cb) cb();
