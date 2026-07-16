@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-40</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-41</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -3618,6 +3618,7 @@ setInterval(updateLoginClock, 30000);
     <div class="filter-chip" onclick="filterCari('taseron',this)" style="border-color:rgba(245,158,11,.3);color:#fbbf24;">Taşeronlar</div>
     <div class="filter-chip" onclick="filterCari('firma',this)" style="border-color:rgba(59,130,246,.3);color:#60a5fa;">Firmalar</div>
     <div class="filter-chip" onclick="filterCari('diger',this)" style="border-color:rgba(255,255,255,.1);color:var(--muted2);">Diğer</div>
+    <div class="filter-chip" onclick="filterCari('arsiv',this)" style="border-color:rgba(148,163,184,.3);color:#94a3b8;">📦 Arşiv</div>
   </div>
 
   <div class="search-wrap" style="margin-bottom:14px;">
@@ -14492,13 +14493,54 @@ function renderCariListe(){
   });
 
   // Filtre mantığı
-  let filtered = _cariFilter==='all' ? entries.filter(c=>c.tur!=='kasa') : entries;
-  if(_cariFilter==='kasa') filtered = entries.filter(c=>c.tur==='kasa');
-  else if(_cariFilter==='personel') filtered = entries.filter(c=>c.tur==='personel'||c.tur==='sofor');
-  else if(_cariFilter==='taseron') filtered = entries.filter(c=>c.tur==='taseron');
-  else if(_cariFilter==='firma') filtered = entries.filter(c=>c.tur==='firma'||c.tur==='okul');
-  else if(_cariFilter==='basvuru') filtered = entries.filter(c=>c.tur==='basvuru');
-  else if(_cariFilter==='diger') filtered = entries.filter(c=>c.tur!=='sofor'&&c.tur!=='taseron'&&c.tur!=='personel'&&c.tur!=='firma'&&c.tur!=='okul'&&c.tur!=='kasa');
+  // NOT: Arşivlenmiş cariler (c.arsiv===true) "arsiv" filtresi dışında HİÇBİR listede
+  // görünmez. Mevcut kayıtlarda bu alan hiç yoktu (undefined) — undefined!==true her
+  // zaman doğru olduğu için eski veriler otomatik olarak "arşivlenmemiş" sayılır,
+  // hiçbir mevcut cari kaybolmaz/bozulmaz.
+  if(_cariFilter === 'arsiv'){
+    let filtered = entries.filter(c=>c.arsiv===true);
+    if(_cariSearchTerm){
+      const q = _cariSearchTerm.toLowerCase();
+      filtered = filtered.filter(c=>
+        (c.isim||'').toLowerCase().includes(q) ||
+        (c.plaka||'').toLowerCase().includes(q) ||
+        (c.firma||'').toLowerCase().includes(q) ||
+        (c.servis||'').toLowerCase().includes(q)
+      );
+    }
+    filtered.sort((a,b)=> (a.isim||'').localeCompare(b.isim||'','tr'));
+    if(countEl) countEl.textContent = filtered.length + ' arşivlenmiş cari';
+    _setText('cd-toplam-cari', filtered.length);
+    _setText('cd-toplam-borc', _fmtPara(0));
+    _setText('cd-toplam-alacak', _fmtPara(0));
+    const netElA = document.getElementById('cd-net-bakiye');
+    if(netElA){ netElA.textContent = _fmtPara(0); netElA.style.color = 'var(--muted2)'; }
+    if(!filtered.length){
+      wrap.innerHTML = '<div class="empty"><div class="empty-icon">📦</div>Arşivde hiç cari yok.</div>';
+      return;
+    }
+    let archHtml = '';
+    filtered.forEach(c=>{
+      archHtml += `<div style="display:flex;align-items:center;gap:14px;padding:15px 18px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:14px;margin-bottom:8px;opacity:.75;">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(148,163,184,.08);border:1px solid rgba(148,163,184,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;">📦</div>
+        <div style="flex:1;min-width:0;cursor:pointer;" onclick="openCariDetay('${c.id}')">
+          <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(c.isim||'İsimsiz')}</div>
+          <div style="font-size:10px;color:var(--muted2);margin-top:3px;">${c.arsivTarihi?'Arşivlendi: '+_esc(c.arsivTarihi):''}</div>
+        </div>
+        <button onclick="event.stopPropagation();_cariArsivdenCikar('${c.id}')" style="padding:7px 12px;border-radius:8px;border:1px solid rgba(74,222,128,.3);background:rgba(74,222,128,.08);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">↩️ Arşivden Çıkar</button>
+      </div>`;
+    });
+    wrap.innerHTML = archHtml;
+    return;
+  }
+
+  let filtered = _cariFilter==='all' ? entries.filter(c=>c.tur!=='kasa' && c.arsiv!==true) : entries.filter(c=>c.arsiv!==true);
+  if(_cariFilter==='kasa') filtered = entries.filter(c=>c.tur==='kasa' && c.arsiv!==true);
+  else if(_cariFilter==='personel') filtered = entries.filter(c=>(c.tur==='personel'||c.tur==='sofor') && c.arsiv!==true);
+  else if(_cariFilter==='taseron') filtered = entries.filter(c=>c.tur==='taseron' && c.arsiv!==true);
+  else if(_cariFilter==='firma') filtered = entries.filter(c=>(c.tur==='firma'||c.tur==='okul') && c.arsiv!==true);
+  else if(_cariFilter==='basvuru') filtered = entries.filter(c=>c.tur==='basvuru' && c.arsiv!==true);
+  else if(_cariFilter==='diger') filtered = entries.filter(c=>c.tur!=='sofor'&&c.tur!=='taseron'&&c.tur!=='personel'&&c.tur!=='firma'&&c.tur!=='okul'&&c.tur!=='kasa' && c.arsiv!==true);
 
   if(_cariSearchTerm){
     const q = _cariSearchTerm.toLowerCase();
@@ -14659,6 +14701,8 @@ function renderCariDetay(id){
         <div style="font-size:12px;color:var(--muted2);margin-top:2px;">${c.firma?'🏢 '+_esc(c.firma)+' &nbsp; ':''}${c.tel?'📱 '+_esc(c.tel)+' &nbsp; ':''}${c.plaka?'🚗 '+_esc(c.plaka):''}</div>
         ${c.not?'<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic;white-space:pre-wrap;">'+_esc(c.not)+'</div>':''}
       </div>
+      <button onclick="arsivleCari('${id}')" style="display:${(window._kasaModOnly||c.arsiv)?'none':'inline-flex'};padding:8px 12px;border-radius:9px;border:1px solid rgba(148,163,184,.25);background:rgba(148,163,184,.06);color:#94a3b8;font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;margin-right:8px;">📦 Arşivle</button>
+      <button onclick="_cariArsivdenCikar('${id}')" style="display:${c.arsiv?'inline-flex':'none'};padding:8px 12px;border-radius:9px;border:1px solid rgba(74,222,128,.3);background:rgba(74,222,128,.08);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;margin-right:8px;">↩️ Arşivden Çıkar</button>
       <button onclick="deleteCari('${id}')" style="display:${window._kasaModOnly?'none':'inline-flex'};padding:8px 12px;border-radius:9px;border:1px solid rgba(239,68,68,.2);background:rgba(239,68,68,.06);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;">Sil</button>
     </div>
     ${c.tur==='taseron' && Array.isArray(c.okulYovmiye) && c.okulYovmiye.length ? '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);display:flex;flex-wrap:wrap;gap:6px;">' + c.okulYovmiye.map(oy=>{ const sc=SCHOOLS.find(s=>s.key===oy.okulKey); return '<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:#fbbf24;">' + (sc?sc.short||sc.name:oy.okulKey) + ': ' + parseFloat(oy.yovmiye).toLocaleString('tr-TR') + '₺/gün</span>'; }).join('') + '</div>' : ''}`;
@@ -15469,6 +15513,35 @@ function deleteCari(id){
     gotoC('cari-liste');
   };
   cm.style.display='flex';
+}
+
+// Arşivleme: cari verisi/hareketleri SİLİNMEZ, sadece "arsiv" bayrağı ile işaretlenir
+// ve normal listelerden gizlenir. Tamamen geri alınabilir, veri kaybı riski yok.
+function arsivleCari(id){
+  if(!_cariData[id]) return;
+  const cm=document.getElementById('confirm-modal');
+  _setText('confirm-title','Cariyi Arşivle');
+  _setText('confirm-msg','"'+(_cariData[id].isim||'')+'" arşive taşınacak. Cari Hesaplar listesinde artık görünmeyecek, ama verileri (hareketler dahil) hiçbir şekilde silinmeyecek — "Arşiv" sekmesinden istediğiniz zaman geri çıkarabilirsiniz.');
+  const okBtn=document.getElementById('confirm-ok-btn');
+  okBtn.textContent='Evet, Arşivle';
+  okBtn.onclick=async function(){
+    _cariData[id].arsiv = true;
+    _cariData[id].arsivTarihi = new Date().toLocaleDateString('tr-TR');
+    await _saveCariToStorage();
+    cm.style.display='none';
+    showToast('📦 "'+(_cariData[id].isim||'')+'" arşive taşındı','success');
+    gotoC('cari-liste');
+  };
+  cm.style.display='flex';
+}
+
+async function _cariArsivdenCikar(id){
+  if(!_cariData[id]) return;
+  delete _cariData[id].arsiv;
+  delete _cariData[id].arsivTarihi;
+  await _saveCariToStorage();
+  showToast('↩️ "'+(_cariData[id].isim||'')+'" arşivden çıkarıldı','success');
+  renderCariListe();
 }
 
 // Cari modal: taşeron seçilince okul-yövmiye satırlarını göster/gizle
