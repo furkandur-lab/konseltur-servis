@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-42</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-43</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -2887,6 +2887,10 @@ setInterval(updateLoginClock, 30000);
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
+        <input type="file" id="bsv-import-file" accept=".xlsx,.xls" style="display:none;" onchange="_bsvImportExcel(event)">
+        <button onclick="document.getElementById('bsv-import-file').click()" style="display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;border:1px solid rgba(45,212,191,.3);background:rgba(45,212,191,.08);color:#2dd4bf;font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;">
+          📥 Excel'den İçe Aktar
+        </button>
         <button onclick="openYeniBasvuruForm()" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:1px solid rgba(251,146,60,.35);background:rgba(251,146,60,.1);color:#fb923c;font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;" onmouseover="this.style.background='rgba(251,146,60,.18)'" onmouseout="this.style.background='rgba(251,146,60,.1)'">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Yeni Başvuru
@@ -16871,6 +16875,129 @@ function saveBasvuru(){
   _saveBasvurular(list); resetBasvuruForm(); renderBasvuruListe(); _updateLoginBasvuruCount();
   if(typeof showToast==='function') showToast('\u2705 Ba\u015fvuru kaydedildi','success');
 }
+// Excel'den İş Başvuruları içe aktarma — "İŞ BAŞVURU" sekmesi formatını tanır
+// (SR NO, BAŞ. TARİHİ, ADI SOYADI, ADRESİ, CEP 1, DURUMU, YAŞ, TECRÜBE, REFERANS,
+// EHLİYET, SRC, PSİKOTEKNİK). Adres bilgisi (uygulamada ayrı bir alanı olmadığı için)
+// Notlar alanına ekleniyor.
+function _bsvImportExcel(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  event.target.value = '';
+  _ensureXLSX(function(){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type:'array', cellDates:true});
+        // "BAŞVURU" geçen bir sekme ara (İŞ BAŞVURU, İş Başvuruları vb. varyasyonlara dayanıklı)
+        const sheetName = workbook.SheetNames.find(sn => sn.toUpperCase().includes('BAŞVURU'));
+        if(!sheetName){ showToast('❌ Excel içinde "Başvuru" adlı bir sekme bulunamadı','error'); return; }
+        const ws = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:false});
+        if(!rows || rows.length < 2){ showToast('❌ Sekme boş görünüyor','error'); return; }
+
+        // Başlık satırını bul (ADI SOYADI geçen satır)
+        let hRow = -1, cols = {};
+        for(let ri=0; ri<Math.min(5, rows.length); ri++){
+          const rowU = (rows[ri]||[]).map(v => (v||'').toString().toUpperCase().trim());
+          const idx = rowU.findIndex(v => v.includes('ADI SOYADI') || v.includes('AD SOYAD'));
+          if(idx >= 0){
+            hRow = ri;
+            rowU.forEach((v,ci) => {
+              if(v.includes('ADI SOYADI')||v.includes('AD SOYAD')) cols.isim = ci;
+              else if(v.includes('TARİH')) cols.tarih = ci;
+              else if(v.includes('ADRES')) cols.adres = ci;
+              else if(v.includes('CEP')||v.includes('TEL')) cols.tel = ci;
+              else if(v.includes('DURUM')) cols.durum = ci;
+              else if(v.includes('YAŞ')) cols.yas = ci;
+              else if(v.includes('TECRÜBE')||v.includes('TECRUBE')) cols.tecrube = ci;
+              else if(v.includes('REFERANS')) cols.referans = ci;
+              else if(v.includes('EHLİYET')||v.includes('EHLIYET')) cols.ehliyet = ci;
+              else if(v==='SRC') cols.src = ci;
+              else if(v.includes('PSİKOTEKNİK')||v.includes('PSIKOTEKNIK')) cols.psiko = ci;
+            });
+            break;
+          }
+        }
+        if(hRow < 0 || cols.isim===undefined){ showToast('❌ "ADI SOYADI" sütunu bulunamadı','error'); return; }
+
+        const list = _loadBasvurular();
+        let added = 0, skipped = 0;
+
+        for(let ri=hRow+1; ri<rows.length; ri++){
+          const row = rows[ri];
+          if(!row) continue;
+          const isim = (row[cols.isim]||'').toString().trim();
+          if(!isim) continue; // isimsiz satır
+
+          // Tarihi YYYY-MM-DD formatına çevir
+          let tarih = '';
+          const tRaw = cols.tarih!==undefined ? row[cols.tarih] : null;
+          if(tRaw instanceof Date && !isNaN(tRaw)){
+            tarih = tRaw.toISOString().split('T')[0];
+          } else if(tRaw){
+            const s = tRaw.toString().trim();
+            const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if(m) tarih = m[0];
+          }
+
+          const durumRaw = cols.durum!==undefined ? (row[cols.durum]||'').toString().trim().toUpperCase() : '';
+          let emekli = '';
+          if(durumRaw === 'EMEKLİ') emekli = 'evet';
+          else if(durumRaw === 'EMEKLİ DEĞİL') emekli = 'hayir';
+
+          const srcRaw = cols.src!==undefined ? (row[cols.src]||'').toString().trim().toUpperCase() : '';
+          const psikoRaw = cols.psiko!==undefined ? (row[cols.psiko]||'').toString().trim().toUpperCase() : '';
+          const tecrubeRaw = cols.tecrube!==undefined ? (row[cols.tecrube]||'').toString().trim().toUpperCase() : '';
+          const ehliyetRaw = cols.ehliyet!==undefined ? (row[cols.ehliyet]||'').toString().trim().toUpperCase() : '';
+
+          // Aynı isim + tarihte kayıt zaten varsa tekrar eklenmesin (aynı dosyayı 2. kez
+          // yüklerseniz çift kayıt oluşmaz)
+          const zatenVar = list.some(b => (b.isim||'').trim().toUpperCase()===isim.toUpperCase() && b.tarih===tarih);
+          if(zatenVar){ skipped++; continue; }
+
+          // Adres bilgisi + (varsa) "DURUMU" sütunundaki emekli/hayır dışı kalan serbest
+          // metin (örn. HOSTES) + ehliyet sınıfı belirsizse "ehliyeti var" notu — hepsi
+          // istediğiniz gibi Notlar alanına ekleniyor
+          const adres = cols.adres!==undefined ? (row[cols.adres]||'').toString().trim() : '';
+          const notParts = [];
+          if(adres) notParts.push('Adres: '+adres);
+          if(durumRaw && durumRaw!=='EMEKLİ' && durumRaw!=='EMEKLİ DEĞİL') notParts.push('Durum: '+durumRaw);
+          if(ehliyetRaw==='V' || ehliyetRaw==='VAR') notParts.push('Ehliyeti var (sınıfı Excel\'de belirtilmemiş)');
+
+          const bsv = {
+            id: String(Date.now()) + '_' + added,
+            isim,
+            yas: cols.yas!==undefined ? (row[cols.yas]||'').toString().trim() : '',
+            tel: cols.tel!==undefined ? (row[cols.tel]||'').toString().trim() : '',
+            tarih,
+            ehliyet: '', // Excel'de sadece "var/yok" bilgisi var, sınıf (B/C/D/E) belirtilmemiş — notlara eklendi
+            src: srcRaw==='VAR' ? 'var' : (srcRaw==='YOK' ? 'yok' : ''),
+            psiko: psikoRaw==='VAR' ? 'var' : (psikoRaw==='YOK' ? 'yok' : ''),
+            emekli,
+            tecrube: tecrubeRaw==='VAR' ? 'var' : (tecrubeRaw==='YOK' ? 'yok' : ''),
+            sure: '',
+            referans: cols.referans!==undefined ? (row[cols.referans]||'').toString().trim() : '',
+            not: notParts.join(' · '),
+            ts: Date.now(),
+          };
+          list.unshift(bsv);
+          added++;
+        }
+
+        _saveBasvurular(list);
+        renderBasvuruListe();
+        _updateLoginBasvuruCount();
+        showToast(`✅ ${added} başvuru aktarıldı${skipped?', '+skipped+' zaten vardı (atlandı)':''}`, 'success');
+      }catch(err){
+        console.error('İş Başvuruları içe aktarma hatası:', err);
+        showToast('❌ Excel okuma hatası: '+(err.message||'bilinmeyen'), 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 function editBasvuru(id){
   const b=_loadBasvurular().find(x=>x.id===id); if(!b) return;
   document.getElementById('bsv-edit-id').value=b.id;
@@ -16911,23 +17038,23 @@ function renderBasvuruListe(){
     <div style="background:rgba(255,255,255,.025);border:1px solid rgba(251,146,60,.12);border-left:3px solid rgba(251,146,60,.45);border-radius:14px;padding:14px 16px;transition:border-color .18s;" onmouseover="this.style.borderColor='rgba(251,146,60,.3)'" onmouseout="this.style.borderColor='rgba(251,146,60,.12)'">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;">
         <div>
-          <div style="font-weight:700;font-size:14px;color:#fff;">${b.isim||'\u0130simsiz'}</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;">${b.tarih||'\u2014'}${b.tel?' \u00b7 \ud83d\udcf1 '+b.tel:''}${b.yas?' \u00b7 \ud83c\udf82 '+b.yas+' ya\u015f':''}</div>
+          <div style="font-weight:700;font-size:14px;color:#fff;">${escHtml(b.isim||'İsimsiz')}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;">${escHtml(b.tarih||'—')}${b.tel?' · 📱 '+escHtml(b.tel):''}${b.yas?' · 🎂 '+escHtml(b.yas)+' yaş':''}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;">
-          <button onclick="editBasvuru('${b.id}')" style="width:28px;height:28px;border-radius:7px;border:1px solid rgba(96,165,250,.2);background:rgba(96,165,250,.07);color:#60a5fa;cursor:pointer;font-size:12px;" title="D\u00fczeenle">\u270f</button>
-          <button onclick="deleteBasvuru('${b.id}')" style="width:28px;height:28px;border-radius:7px;border:1px solid rgba(239,68,68,.2);background:rgba(239,68,68,.06);color:#f87171;cursor:pointer;font-size:14px;" title="Sil">\u00d7</button>
+          <button onclick="editBasvuru('${b.id}')" style="width:28px;height:28px;border-radius:7px;border:1px solid rgba(96,165,250,.2);background:rgba(96,165,250,.07);color:#60a5fa;cursor:pointer;font-size:12px;" title="Düzenle">✏</button>
+          <button onclick="deleteBasvuru('${b.id}')" style="width:28px;height:28px;border-radius:7px;border:1px solid rgba(239,68,68,.2);background:rgba(239,68,68,.06);color:#f87171;cursor:pointer;font-size:14px;" title="Sil">×</button>
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:5px;">
-        ${b.ehliyet?`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(251,146,60,.1);color:#fb923c;border:1px solid rgba(251,146,60,.2);">\ud83e\udeb9 ${b.ehliyet}</span>`:''}
+        ${b.ehliyet?`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(251,146,60,.1);color:#fb923c;border:1px solid rgba(251,146,60,.2);">🪹 ${escHtml(b.ehliyet)}</span>`:''}
         ${_pill(b.src,'SRC','SRC Yok')}
         ${_pill(b.psiko,'Psiko','Psiko Yok')}
         ${_pill(b.emekli,'Emekli','Aktif')}
-        ${b.tecrube==='var'?`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2);">\u2b50 ${b.sure?b.sure+'y':'Tec.'}</span>`:b.tecrube==='yok'?'<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);">Tec. yok</span>':''}
-        ${b.referans?`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.45);">\ud83d\udcce ${b.referans}</span>`:''}
+        ${b.tecrube==='var'?`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2);">⭐ ${b.sure?escHtml(b.sure)+'y':'Tec.'}</span>`:b.tecrube==='yok'?'<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);">Tec. yok</span>':''}
+        ${b.referans?`<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.45);">📎 ${escHtml(b.referans)}</span>`:''}
       </div>
-      ${b.not?`<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.35);font-style:italic;">${b.not}</div>`:''}
+      ${b.not?`<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.35);font-style:italic;">${escHtml(b.not)}</div>`:''}
     </div>`).join('');
 }
 try{ _updateLoginBasvuruCount(); }catch(e){}
