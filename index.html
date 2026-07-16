@@ -1589,7 +1589,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-50</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-51</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -6431,9 +6431,12 @@ function loadGorevData(){
       const dbRef = window._fbRef(window._fbDb, 'konseltur/' + (_activeSchoolKey||'GLOBAL') + '/gorev');
       window._fbGorevUnsub = window._fbOnValue(dbRef, snap=>{
         window._gorevFbSynced = true;
-        // Bu dinleyici kurulduktan SONRA yerel bir kayıt yapıldıysa, gelen anlık görüntü
-        // muhtemelen o kaydı henüz içermiyordur — üzerine yazma
-        if(_lastGorevSaveAt > reqTime) return;
+        // Sadece bu kayıttan HEMEN SONRA (birkaç saniye içinde) gelen bir anlık görüntüyü
+        // yok say (kendi yazdığımızın gecikmeli yankısı olabilir). Daha sonra gelen
+        // güncellemeler (örn. başka bir cihazdan) normal şekilde uygulanır — aksi halde
+        // bu oturumda bir kez kayıt yapan cihaz, o oturum boyunca diğer cihazlardaki
+        // değişiklikleri hiç görmez (mobil/PC arasında veri sapması hatasının kök nedeni buydu)
+        if(Date.now() - _lastGorevSaveAt < 4000) return;
         const val = snap.val();
         let fbGorev = [];
         if(val && Array.isArray(val)) fbGorev = val;
@@ -6710,8 +6713,12 @@ function _loadFromFirebase(){
  if(window._fbMainUnsub) { try{ window._fbMainUnsub(); }catch(e){} }
  const mainRef = window._fbRef(window._fbDb, path);
  window._fbMainUnsub = window._fbOnValue(mainRef, snapshot=>{
- // RACE CONDITION KORUMASI
- if(_lastClearedAt > reqTime || _lastLocalSaveAt > reqTime){ return; }
+ // RACE CONDITION KORUMASI — sadece HEMEN SONRAKİ birkaç saniyeyi korur, kalıcı
+ // olarak susturmaz. Kalıcı susturma, aynı oturumda bir kez kayıt yapan bir cihazın
+ // (PC veya mobil) o oturum boyunca DİĞER cihazdaki değişiklikleri hiç görmemesine
+ // sebep oluyordu — bildirilen "mobil ve PC'de farklı sayıda kayıt görünüyor" hatasının
+ // kök nedeni tam olarak buydu.
+ if(Date.now()-_lastClearedAt < 4000 || Date.now()-_lastLocalSaveAt < 4000){ return; }
  if(!snapshot.exists()){
    // Firebase'de veri yok — localStorage'daki veriyi Firebase'e yaz (ilk sync)
    if(students.length > 0 || drivers.length > 0){
@@ -6790,7 +6797,7 @@ function _loadPaymentsFromFirebase(){
    window._paymentsFbSynced = true;
    // Bu dinleyici kurulduktan SONRA yerel bir kayıt yapıldıysa, gelen anlık görüntü
    // muhtemelen o kaydı henüz içermiyordur (gecikmeli/eski) — üzerine yazma.
-   if(_lastPaymentsSaveAt > reqTime) return;
+   if(Date.now() - _lastPaymentsSaveAt < 4000) return;
    if(snapshot && snapshot.exists()){
      const d = snapshot.val();
      if(d && typeof d==='object'){
@@ -12662,7 +12669,7 @@ function loadSoforData(){
       window._soforFbSynced = true;
       // Bu dinleyici kurulduktan SONRA yerel bir kayıt yapıldıysa, gelen anlık görüntü
       // muhtemelen o kaydı henüz içermiyordur — üzerine yazma (bkz. Cari modülündeki aynı düzeltme)
-      if(_lastSoforSaveAt > reqTime) return;
+      if(Date.now() - _lastSoforSaveAt < 4000) return;
       const d = snap.val();
       if(d){
         // Blind overwrite yerine id bazlı güvenli birleştirme
@@ -14466,7 +14473,7 @@ function loadCariData(){
         window._cariFbSynced = true; // İlk (veya sonraki) gerçek Firebase anlık görüntüsü geldi
         // Bu dinleyici kurulduktan SONRA yerel bir kayıt yapıldıysa, gelen anlık görüntü
         // muhtemelen o kaydı henüz içermiyordur (gecikmeli/eski) — üzerine yazma.
-        if(_lastCariSaveAt > reqTime){ return; }
+        if(Date.now() - _lastCariSaveAt < 4000){ return; }
         const val = snap.val();
         if(val){
           // Blind overwrite yerine güvenli birleştirme: Firebase'deki kayıtlar önceliklidir,
@@ -15346,7 +15353,7 @@ function _trashLoad() {
       // Yarış durumu koruması: bu dinleyici kurulduktan SONRA yerel bir silme/ekleme
       // yapıldıysa, gelen anlık görüntü muhtemelen eski/gecikmelidir — üzerine yazma
       // (silinen bir öğenin geri gelmesi hatasının kök nedeni buydu)
-      if(_lastTrashSaveAt > reqTime) return;
+      if(Date.now() - _lastTrashSaveAt < 4000) return;
       if(snap && snap.exists()){
         const fb = snap.val();
         if(Array.isArray(fb) && fb.length > (window._trash||[]).length){
@@ -17963,7 +17970,7 @@ function _ggLoad(cb){
       // Yarış durumu koruması: bu dinleyici kurulduktan SONRA yerel bir kayıt
       // yapıldıysa, gelen anlık görüntü muhtemelen eski/eksiktir — üzerine yazma
       // (bkz. Cari/Ödeme modüllerindeki aynı düzeltme)
-      if(_lastGGSaveAt > reqTime){ _fireCbOnce(); return; }
+      if(Date.now() - _lastGGSaveAt < 4000){ _fireCbOnce(); return; }
       if(snap && snap.exists()){
         var d = snap.val();
         if(d && typeof d==='object'){
