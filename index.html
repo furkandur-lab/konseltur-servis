@@ -1589,7 +1589,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-49</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-50</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -6794,8 +6794,21 @@ function _loadPaymentsFromFirebase(){
    if(snapshot && snapshot.exists()){
      const d = snapshot.val();
      if(d && typeof d==='object'){
-       // GLOBAL'den gelen veriyi mevcut payments ile merge et (hiçbir kayıt kaybolmasın)
-       payments = Object.assign({}, payments, d);
+       // GLOBAL'den gelen veriyi mevcut payments ile merge et (hiçbir kayıt kaybolmasın).
+       // Cari'deki aynı düzeltme burada da uygulanıyor: sadece öğrenci ID seviyesinde değil,
+       // her öğrencinin İÇİNDEKİ ay bazlı ödeme kayıtları da ayrıca birleştiriliyor —
+       // aksi halde çevrimdışıyken girilen bir ödeme, sunucudaki eski veriyle ezilebilirdi.
+       const merged = {};
+       const allIds = new Set([].concat(Object.keys(payments||{}), Object.keys(d||{})));
+       allIds.forEach(function(sid){
+         const l = (payments||{})[sid], r = (d||{})[sid];
+         if(l && r && typeof l==='object' && typeof r==='object'){
+           merged[sid] = Object.assign({}, l, r);
+         } else {
+           merged[sid] = l || r;
+         }
+       });
+       payments = merged;
        try{ localStorage.setItem(LS_PAY(), JSON.stringify(payments)); }catch(e){}
        renderUcretOgrenci();
        _renderOverduePanel();
@@ -14457,9 +14470,25 @@ function loadCariData(){
         const val = snap.val();
         if(val){
           // Blind overwrite yerine güvenli birleştirme: Firebase'deki kayıtlar önceliklidir,
-          // ama yerel bellekte olup Firebase'e henüz ulaşmamış kayıtlar (örn. aynı anda
-          // başka bir yazma bekleniyorsa) kaybolmaz.
-          _cariData = Object.assign({}, _cariData, val);
+          // ama yerel bellekte olup Firebase'e henüz ulaşmamış kayıtlar (örn. çevrimdışıyken
+          // eklenmiş bir hareket, ya da aynı anda başka bir yazma bekleniyorsa) kaybolmaz.
+          // NOT: Sadece üst seviye (cari kaydı) değil, her cari'nin İÇİNDEKİ hareketler
+          // alt-nesnesi de işlem ID'sine göre ayrıca birleştiriliyor — aksi halde çevrimdışı
+          // eklenen bir hareket, o cari'nin sunucudaki eski haliyle sessizce ezilebilirdi
+          // (örn. internet olmadan bir hareket girip sekmeyi kapatıp daha sonra tekrar
+          // açtığınızda o hareketin kaybolması riski buydu).
+          const merged = {};
+          const allIds = new Set([].concat(Object.keys(_cariData||{}), Object.keys(val||{})));
+          allIds.forEach(function(id){
+            const l = (_cariData||{})[id], r = (val||{})[id];
+            if(l && r){
+              merged[id] = Object.assign({}, l, r);
+              merged[id].hareketler = Object.assign({}, l.hareketler||{}, r.hareketler||{});
+            } else {
+              merged[id] = l || r;
+            }
+          });
+          _cariData = merged;
           try{ localStorage.setItem(_cariLsKey(), JSON.stringify(_cariData)); }catch(e){}
           if(_currentPage==='cari-liste') renderCariListe();
           if(_currentPage==='cari-detay' && window._activeCariId) renderCariDetay(window._activeCariId);
