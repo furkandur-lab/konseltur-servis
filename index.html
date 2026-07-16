@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-38</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-39</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17606,6 +17606,34 @@ function _ggOpenEkran(){
       if(!a || !a.closest || !a.closest('#gg-screen')) window._ggIsEditing = false;
     }, 150);
   });
+
+  // ── GEÇİCİ TEŞHİS KAYITLARI ──────────────────────────────
+  // Bildirilen "yazarken sayfa en üste kayıyor" hatasının kaynağını kesin olarak
+  // yakalamak için: her focus/blur ve her kaydırma olayını zaman damgasıyla loglar.
+  console.log('%c[GG-TEŞHİS] Ekran açıldı, izleme başladı', 'color:#22c55e;font-weight:bold;');
+  scr.addEventListener('focusin', function(e){
+    console.log('%c[GG-TEŞHİS] focusin →', 'color:#60a5fa;', e.target && e.target.id, e.target && e.target.value, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
+  });
+  scr.addEventListener('focusout', function(e){
+    console.log('%c[GG-TEŞHİS] focusout ←', 'color:#f87171;', e.target && e.target.id, e.target && e.target.value, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
+  });
+  scr.addEventListener('scroll', function(){
+    console.log('%c[GG-TEŞHİS] #gg-screen scroll →', 'color:#a78bfa;', 'scrollTop='+scr.scrollTop, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
+  });
+  window.removeEventListener('scroll', window._ggDiagWinScroll || function(){});
+  window._ggDiagWinScroll = function(){
+    console.log('%c[GG-TEŞHİS] window scroll →', 'color:#e879f9;', 'scrollY='+window.scrollY, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
+  };
+  window.addEventListener('scroll', window._ggDiagWinScroll);
+  document.removeEventListener('scroll', window._ggDiagDocScroll || function(){}, true);
+  window._ggDiagDocScroll = function(e){
+    if(e.target && e.target !== document && e.target.id !== 'gg-screen'){
+      console.log('%c[GG-TEŞHİS] BAŞKA bir eleman kaydı →', 'color:#facc15;font-weight:bold;', e.target.id||e.target.className||e.target.tagName, new Date().toLocaleTimeString()+'.'+new Date().getMilliseconds());
+    }
+  };
+  document.addEventListener('scroll', window._ggDiagDocScroll, true);
+  // ── TEŞHİS SONU ──────────────────────────────────────────
+
   _ggRenderAy();
 }
 
@@ -17655,6 +17683,8 @@ function _ggToplam(list){
 }
 
 function _ggRenderAy(){
+  console.log('%c[GG-TEŞHİS] _ggRenderAy çağrıldı', 'color:#f59e0b;font-weight:bold;', new Date().toLocaleTimeString());
+  console.trace();
   // Kaydırma konumunu koru — ekran yeniden çizilirken en üste sıçramasın
   var _scr = document.getElementById('gg-screen');
   var _scrollTop = _scr ? _scr.scrollTop : 0;
@@ -17697,12 +17727,17 @@ function _ggRenderAy(){
 
   // grup: 'hesap' → tek alan (Gelir, yeşil) · 'servis' → tek alan (Gider, kırmızı)
   function tabloHtml(baslik, list, grup, tp, alanAdi, alanRengi){
+    var karsiAlan = grup==='servis' ? 'gelir' : 'gider';
+    var karsiAd = grup==='servis' ? 'Gelir' : 'Gider';
+    var karsiRenk = grup==='servis' ? {bg:'rgba(34,197,94,.06)', border:'rgba(34,197,94,.15)', text:'#4ade80'} : {bg:'rgba(239,68,68,.06)', border:'rgba(239,68,68,.15)', text:'#f87171'};
     var rowsHtml = list.map(function(r){
       var net = _ggNetOf(r);
       var deger = grup==='servis' ? (r.gider||0) : (r.gelir||0);
+      var karsiDeger = grup==='servis' ? (r.gelir||0) : (r.gider||0);
       return '<div id="gg-row-'+r.id+'" style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);">'
         +'<input value="'+escHtml(r.isim||'')+'" placeholder="Hesap adı" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'isim\',this.value)" style="flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:7px 9px;color:#fff;font-size:12px;">'
-        +'<input type="text" inputmode="numeric" value="'+_ggFormatNum(deger)+'" placeholder="'+alanAdi+'" oninput="_ggOnAmountInput(this,\''+ay+'\',\''+r.id+'\',\''+(grup==='servis'?'gider':'gelir')+'\')" style="width:110px;background:'+alanRengi.bg+';border:1px solid '+alanRengi.border+';border-radius:7px;padding:7px 9px;color:'+alanRengi.text+';font-size:12px;text-align:right;">'
+        +'<input type="text" inputmode="numeric" value="'+_ggFormatNum(deger)+'" placeholder="'+alanAdi+'" title="'+alanAdi+'" oninput="_ggOnAmountInput(this,\''+ay+'\',\''+r.id+'\',\''+(grup==='servis'?'gider':'gelir')+'\')" style="width:100px;background:'+alanRengi.bg+';border:1px solid '+alanRengi.border+';border-radius:7px;padding:7px 9px;color:'+alanRengi.text+';font-size:12px;text-align:right;">'
+        +'<input type="text" inputmode="numeric" value="'+_ggFormatNum(karsiDeger)+'" placeholder="'+karsiAd+'" title="Karşı taraf: '+karsiAd+'" oninput="_ggOnAmountInput(this,\''+ay+'\',\''+r.id+'\',\''+karsiAlan+'\')" style="width:100px;background:'+karsiRenk.bg+';border:1px dashed '+karsiRenk.border+';border-radius:7px;padding:7px 9px;color:'+karsiRenk.text+';font-size:12px;text-align:right;opacity:.75;">'
         +'<div id="gg-net-'+r.id+'" style="width:90px;text-align:right;font-size:12px;font-weight:700;color:'+(net>=0?'#60a5fa':'#f87171')+';">₺'+_ggFormatNum(Math.abs(net))+(net<0?' -':'')+'</div>'
         +'<button onclick="_ggDeleteRow(\''+ay+'\',\''+r.id+'\')" style="width:28px;height:28px;flex-shrink:0;border-radius:7px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:#f87171;cursor:pointer;font-size:14px;">×</button>'
       +'</div>';
