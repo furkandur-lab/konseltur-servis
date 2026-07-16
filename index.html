@@ -1589,7 +1589,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-46</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-47</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -2794,6 +2794,7 @@ setInterval(updateLoginClock, 30000);
         <div style="flex:1;">
           <div id="notepad-input-wrap" style="border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:8px;transition:border-color .2s;">
           <input id="notepad-tag" type="hidden" value="">
+          <input id="notepad-edit-id" type="hidden" value="">
           <input id="notepad-title" placeholder="Not başlığı..." maxlength="80"
             style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:#fff;font-size:13px;font-weight:600;padding:9px 12px;font-family:Outfit,sans-serif;outline:none;box-sizing:border-box;margin-bottom:6px;"
             onfocus="this.style.borderColor='rgba(139,92,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.08)'"
@@ -2801,10 +2802,13 @@ setInterval(updateLoginClock, 30000);
           <textarea id="notepad-content" placeholder="Not içeriği..." maxlength="2000"
             style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:#fff;font-size:12px;padding:9px 12px;font-family:Outfit,sans-serif;outline:none;resize:none;height:72px;box-sizing:border-box;"
             onfocus="this.style.borderColor='rgba(139,92,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.08)'"></textarea>
+          <div id="notepad-edit-banner" style="display:none;font-size:11px;color:#a78bfa;margin-top:6px;">
+            ✏️ Not düzenleniyor — <span onclick="cancelEditNote()" style="text-decoration:underline;cursor:pointer;color:rgba(255,255,255,.5);">iptal et</span>
+          </div>
           </div><!-- /notepad-input-wrap -->
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;padding-top:2px;">
-          <button onclick="addNote()" style="padding:9px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,rgba(139,92,246,.9),rgba(109,40,217,.9));color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;white-space:nowrap;">Ekle</button>
+          <button id="notepad-submit-btn" onclick="addNote()" style="padding:9px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,rgba(139,92,246,.9),rgba(109,40,217,.9));color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;white-space:nowrap;">Ekle</button>
           <select id="note-tag-select" onchange="setNoteTag(this.value)" style="padding:7px 8px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:rgba(255,255,255,.6);font-size:11px;font-family:Outfit,sans-serif;">
             <option value="">Etiket</option>
             <option value="önemli">🔴 Önemli</option>
@@ -5729,6 +5733,7 @@ function openNotepad(){
 }
 function closeNotepad(){
   document.getElementById('notepad-modal').style.display='none';
+  cancelEditNote();
 }
 function handleNotepadBackdrop(e){
   if(e.target.id==='notepad-modal') closeNotepad();
@@ -5742,10 +5747,54 @@ function addNote(){
     return; 
   }
   const tag = document.getElementById('notepad-tag').value||'';
+  const editIdRaw = document.getElementById('notepad-edit-id').value||'';
   const notes = _safeParseLS('_konseltur_notes', []);
-  notes.unshift({id:Date.now(), title:title||'Başlıksız', content:body, tag,
-    date:new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})});
+  let msg = '✅ Not eklendi';
+  if(editIdRaw){
+    // Düzenleme modu: mevcut notu güncelle (tarihi de "düzenlendi" olarak yenile)
+    const editId = Number(editIdRaw);
+    const idx = notes.findIndex(n=>n.id===editId);
+    if(idx>=0){
+      notes[idx].title = title||'Başlıksız';
+      notes[idx].content = body;
+      notes[idx].tag = tag;
+      notes[idx].date = new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}) + ' (düzenlendi)';
+      msg = '✅ Not güncellendi';
+    }
+  } else {
+    notes.unshift({id:Date.now(), title:title||'Başlıksız', content:body, tag,
+      date:new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})});
+  }
   localStorage.setItem('_konseltur_notes', JSON.stringify(notes));
+  cancelEditNote(); // formu ve düzenleme durumunu sıfırla
+  renderNotes();
+  if(typeof toast==='function') toast(msg,'success');
+}
+// Bir notu düzenlemek için formu doldurur ve "düzenleme modu"na geçer
+function editNote(id){
+  const notes = _safeParseLS('_konseltur_notes', []);
+  const n = notes.find(x=>x.id===id);
+  if(!n) return;
+  document.getElementById('notepad-edit-id').value = n.id;
+  document.getElementById('notepad-title').value = n.title||'';
+  document.getElementById('notepad-content').value = n.content||'';
+  document.getElementById('notepad-tag').value = n.tag||'';
+  window._noteTag = n.tag||'';
+  document.querySelectorAll('.ntag-btn').forEach(b=>{
+    const isActive = b.dataset.tag === window._noteTag;
+    b.style.opacity = window._noteTag && !isActive ? '.35' : '1';
+    b.style.transform = isActive ? 'scale(1.07)' : 'scale(1)';
+    b.style.borderWidth = isActive ? '2px' : '1px';
+  });
+  const banner = document.getElementById('notepad-edit-banner');
+  if(banner) banner.style.display = 'block';
+  const btn = document.getElementById('notepad-submit-btn');
+  if(btn) btn.textContent = 'Güncelle';
+  document.getElementById('notepad-title').focus();
+  document.getElementById('notepad-title').scrollIntoView({behavior:'smooth', block:'center'});
+}
+function cancelEditNote(){
+  document.getElementById('notepad-edit-id').value='';
   document.getElementById('notepad-title').value='';
   document.getElementById('notepad-content').value='';
   document.getElementById('notepad-content').style.height='72px';
@@ -5753,8 +5802,10 @@ function addNote(){
   document.querySelectorAll('.ntag-btn').forEach(b=>{ b.style.opacity='1'; b.style.transform='scale(1)'; b.style.borderWidth='1px'; });
   document.getElementById('notepad-tag').value='';
   document.getElementById('notepad-input-wrap').style.borderColor='rgba(255,255,255,.07)';
-  renderNotes();
-  if(typeof toast==='function') toast('✅ Not eklendi','success');
+  const banner = document.getElementById('notepad-edit-banner');
+  if(banner) banner.style.display = 'none';
+  const btn = document.getElementById('notepad-submit-btn');
+  if(btn) btn.textContent = 'Ekle';
 }
 function deleteNote(id){
   const notes = _safeParseLS('_konseltur_notes', []).filter(n=>n.id!==id);
@@ -5802,9 +5853,14 @@ function renderNotes(){
           <div style="width:28px;height:28px;border-radius:8px;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${ts.icon}</div>
           <span style="font-family:Syne,sans-serif;font-size:13px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(n.title)}</span>
         </div>
-        <button onclick="deleteNote(${n.id})" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);border-radius:7px;color:rgba(255,255,255,.25);cursor:pointer;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;" onmouseover="this.style.background='rgba(239,68,68,.15)';this.style.color='#ef4444'" onmouseout="this.style.background='rgba(255,255,255,.05)';this.style.color='rgba(255,255,255,.25)'">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div style="display:flex;gap:5px;flex-shrink:0;">
+          <button onclick="editNote(${n.id})" style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.18);border-radius:7px;color:#a78bfa;cursor:pointer;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;" onmouseover="this.style.background='rgba(139,92,246,.2)'" onmouseout="this.style.background='rgba(139,92,246,.08)'" title="Düzenle">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+          </button>
+          <button onclick="deleteNote(${n.id})" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);border-radius:7px;color:rgba(255,255,255,.25);cursor:pointer;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;" onmouseover="this.style.background='rgba(239,68,68,.15)';this.style.color='#ef4444'" onmouseout="this.style.background='rgba(255,255,255,.05)';this.style.color='rgba(255,255,255,.25)'" title="Sil">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>
       ${preview?`<div style="font-size:12px;color:rgba(255,255,255,.45);line-height:1.75;margin-bottom:${isLong?'4':'10'}px;white-space:pre-wrap;">${preview}</div>`:''}
       ${isLong?`<div onclick="toggleNoteExpand(${n.id})" style="font-size:11px;color:${ts.color};font-weight:700;cursor:pointer;margin-bottom:10px;display:inline-block;">${isExpanded?'▲ Daha az göster':'▼ Devamını gör'}</div>`:''}
