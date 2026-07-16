@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-27</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-28</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -6681,13 +6681,23 @@ function loadPayments(){
 // Aynı sınıf hata Ücret ödemelerinde de riskliydi (GLOBAL düğüm + tam üzerine yazma) —
 // cari düzeltmesiyle aynı korumayı burada da uyguluyoruz.
 window._paymentsFbSynced = false;
+// Cari'deki aynı zaman damgası koruması: sadece nesne birleştirme (merge) tek başına
+// yeterli değil — aynı öğrencinin İÇİNDEKİ farklı bir ay alanı yerel olarak eklenmişse
+// ve eski bir Firebase anlık görüntüsü o öğrenciyi hâlâ eksik haliyle içeriyorsa, sığ
+// (shallow) birleştirme o öğrencinin tüm kaydını eski haliyle değiştirip yeni ayı
+// kaybedebilir. Bu yüzden zaman damgalı ek bir kilit de gerekiyor.
+let _lastPaymentsSaveAt = 0;
 
 function _loadPaymentsFromFirebase(){
  if(!window._fbDb || !window._fbOnValue || !window._fbRef){ window._paymentsFbSynced = true; return; }
+ const reqTime = Date.now();
 
  // 1. GLOBAL payments path'ini realtime dinle (yeni sistem)
  window._fbOnValue(window._fbRef(window._fbDb, 'konseltur/GLOBAL/ucret_payments'), function(snapshot){
    window._paymentsFbSynced = true;
+   // Bu dinleyici kurulduktan SONRA yerel bir kayıt yapıldıysa, gelen anlık görüntü
+   // muhtemelen o kaydı henüz içermiyordur (gecikmeli/eski) — üzerine yazma.
+   if(_lastPaymentsSaveAt > reqTime) return;
    if(snapshot && snapshot.exists()){
      const d = snapshot.val();
      if(d && typeof d==='object'){
@@ -7361,9 +7371,11 @@ function clearStudents(){
  );
 }
 
-function _savePaymentsOnly(){
+async function _savePaymentsOnly(){
  const str = _serialize(payments);
  try{ localStorage.setItem(LS_PAY(), str||'{}'); }catch(e){}
+ _lastPaymentsSaveAt = Date.now();
+ await _waitPaymentsSync();
  if(window._fbReady && window._fbDb){
    window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/ucret_payments'), payments)
      .then(()=>{ _clearPendingPay(); flashSaveDot(); })
@@ -9505,6 +9517,7 @@ async function savePayments(){
      tarih: odeme ? (_existing.tarih || _payDate) : ''
    };
  });
+ _lastPaymentsSaveAt = Date.now();
  _saveAllSchoolsFromUcret();
  const _s = students.find(x=>x.id===_editingStudentId);
  // Açıklamayı öğrenciye kaydet
@@ -9518,6 +9531,7 @@ async function savePayments(){
    flashSaveDot();
  };
  // Güvenlik kilidi: Firebase'in son halini görmeden GLOBAL ödeme düğümünün üzerine yazma
+ _lastPaymentsSaveAt = Date.now();
  await _waitPaymentsSync();
  if(window._fbReady && window._fbDb){
    // Global ID ile doğrudan GLOBAL/payments path'ine yaz — tüm cihazlar aynı path'i okur
@@ -16484,15 +16498,15 @@ function openVeliBasvurulari(){
       html += '<div style="background:rgba(255,255,255,.02);border:1px solid '+(isBekleyen?'rgba(245,158,11,.3)':'rgba(34,197,94,.2)')+';border-radius:12px;padding:14px 16px;margin-bottom:10px;">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">'
           +'<div>'
-            +'<div style="font-family:Syne,sans-serif;font-size:15px;font-weight:900;color:#fff;">'+v.ogrenciAdi+'</div>'
-            +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px;">'+v.sinif+' · '+v.ilce+(v.mahalle?' / '+v.mahalle:'')+'</div>'
-            +'<div style="font-size:11px;color:rgba(255,255,255,.4);">Veli: '+v.veliAdi+' · '+v.telefon+'</div>'
-            +(v.ucret?'<div style="font-size:11px;color:#4ade80;">₺'+v.ucret+'/ay · '+(v.kayitAy||'')+'</div>':'')
+            +'<div style="font-family:Syne,sans-serif;font-size:15px;font-weight:900;color:#fff;">'+escHtml(v.ogrenciAdi)+'</div>'
+            +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px;">'+escHtml(v.sinif)+' · '+escHtml(v.ilce)+(v.mahalle?' / '+escHtml(v.mahalle):'')+'</div>'
+            +'<div style="font-size:11px;color:rgba(255,255,255,.4);">Veli: '+escHtml(v.veliAdi)+' · '+escHtml(v.telefon)+'</div>'
+            +(v.ucret?'<div style="font-size:11px;color:#4ade80;">₺'+escHtml(v.ucret)+'/ay · '+escHtml(v.kayitAy||'')+'</div>':'')
             +'<div style="font-size:10px;color:rgba(255,255,255,.25);margin-top:3px;">'+tarih+'</div>'
           +'</div>'
           +'<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;'+(isBekleyen?'background:rgba(245,158,11,.12);color:#fbbf24;':'background:rgba(34,197,94,.1);color:#4ade80;')+'">'+( isBekleyen?'Beklemede':'Onaylandı')+'</span>'
         +'</div>'
-        +(v.notlar?'<div style="font-size:11px;color:rgba(255,255,255,.35);font-style:italic;margin-bottom:8px;">Not: '+v.notlar+'</div>':'')
+        +(v.notlar?'<div style="font-size:11px;color:rgba(255,255,255,.35);font-style:italic;margin-bottom:8px;">Not: '+escHtml(v.notlar)+'</div>':'')
         +(isBekleyen?'<button data-bkey="'+key+'" onclick="veliBasvuruOnayla(this.dataset.bkey)" style="padding:7px 16px;border-radius:8px;border:none;background:#22c55e;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;">✓ Onayla & Programa Ekle</button>':'')
       +'</div>';
     });
