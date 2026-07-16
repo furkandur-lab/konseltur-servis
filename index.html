@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-31</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-32</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -2542,6 +2542,22 @@ function _addManagedListener(target, event, handler, options) {
           <div style="font-size:11px;color:rgba(255,255,255,.3);font-family:Outfit,sans-serif;" id="arac-takip-ozet">Araçların vize ve sigorta sürelerini takip edin</div>
         </div>
         <div id="arac-takip-uyari" style="display:none;min-width:22px;height:22px;border-radius:11px;background:#ef4444;color:#fff;font-size:11px;font-weight:800;align-items:center;justify-content:center;flex-shrink:0;padding:0 5px;">!</div>
+      </button>
+
+      <!-- Gelir-Gider Takibi -->
+      <button onclick="openGelirGiderModal()"
+        style="width:100%;background:#13171f;border:1px solid rgba(45,212,191,.15);border-radius:12px;padding:10px 14px;text-align:left;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;margin-bottom:8px;"
+        onmouseover="this.style.borderColor='rgba(45,212,191,.4)';this.style.background='#171c26';this.style.transform='translateY(-1px)'"
+        onmouseout="this.style.borderColor='rgba(45,212,191,.15)';this.style.background='#13171f';this.style.transform='none'">
+        <div style="position:absolute;top:14px;right:16px;background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.2);border-radius:20px;padding:3px 10px;font-size:9px;font-weight:800;letter-spacing:1.5px;color:#2dd4bf;font-family:Outfit,sans-serif;">FİNANS</div>
+        <div style="width:32px;height:32px;flex-shrink:0;border-radius:9px;background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.2);display:flex;align-items:center;justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+        </div>
+        <div style="flex:1;">
+          <div style="font-family:Syne,sans-serif;font-size:14px;font-weight:800;color:#fff;margin-bottom:2px;">Gelir-Gider Takibi</div>
+          <div style="font-size:10px;font-weight:700;color:#2dd4bf;margin-bottom:3px;font-family:Outfit,sans-serif;">Aylık Özet</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.3);font-family:Outfit,sans-serif;">Hesap bazında aylık gelir/gider takibi</div>
+        </div>
       </button>
 
       <!-- İş Başvuruları -->
@@ -17439,6 +17455,336 @@ function _updateAracTakipOzet(){
   if(ozet){ozet.textContent=kritik>0?kritik+' araçta kritik tarih!':(list.length?list.length+' araç kayıtlı':'Sigorta ve muayene takibi');ozet.style.color=kritik>0?'#fbbf24':'rgba(255,255,255,.3)';}
 }
 document.addEventListener('DOMContentLoaded',function(){setTimeout(_updateAracTakipOzet,800);});
+
+// ════════════════════════════════════════════════════════════════
+// GELİR-GİDER TAKİBİ — Aylık hesap bazlı gelir/gider özeti
+// Tamamen bağımsız yeni modül. Mevcut Cari/Ücret/Rota sayfa geçiş
+// sistemine hiç dokunmaz — Araç Takip ile aynı, kendi kendine yeten
+// tam ekran katman deseni kullanılır.
+// ════════════════════════════════════════════════════════════════
+const GG_KEY = 'konseltur_gg_v1_GLOBAL';
+const GG_AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+window._ggData = {}; // { "2026-07": { "gg_xxxxxx": {id, isim, gelir, gider, grup:'hesap'|'servis', ts} } }
+window._ggActiveAy = null; // "YYYY-MM"
+window._ggFbSynced = false;
+let _lastGGSaveAt = 0;
+
+function _ggWaitSync(){
+  if(window._ggFbSynced || (typeof navigator!=='undefined' && navigator.onLine===false)) return Promise.resolve();
+  return new Promise(function(resolve){
+    var t0 = Date.now();
+    var iv = setInterval(function(){
+      if(window._ggFbSynced || Date.now()-t0 > 5000){ clearInterval(iv); resolve(); }
+    }, 100);
+  });
+}
+
+function _ggLoad(cb){
+  try{
+    var raw = localStorage.getItem(GG_KEY);
+    if(raw) window._ggData = JSON.parse(raw)||{};
+  }catch(e){ window._ggData = {}; }
+  var reqTime = Date.now();
+  if(window._fbDb && window._fbRef && window._fbOnValue){
+    if(window._fbGGUnsub){ try{ window._fbGGUnsub(); }catch(e){} }
+    window._fbGGUnsub = window._fbOnValue(window._fbRef(window._fbDb,'konseltur/GLOBAL/gelir_gider'), function(snap){
+      window._ggFbSynced = true;
+      // Yarış durumu koruması: bu dinleyici kurulduktan SONRA yerel bir kayıt
+      // yapıldıysa, gelen anlık görüntü muhtemelen eski/eksiktir — üzerine yazma
+      // (bkz. Cari/Ödeme modüllerindeki aynı düzeltme)
+      if(_lastGGSaveAt > reqTime){ if(cb) cb(); return; }
+      if(snap && snap.exists()){
+        var d = snap.val();
+        if(d && typeof d==='object'){
+          window._ggData = Object.assign({}, window._ggData, d);
+          try{ localStorage.setItem(GG_KEY, JSON.stringify(window._ggData)); }catch(e){}
+          if(document.getElementById('gg-screen') && window._ggActiveAy) _ggRenderAy();
+        }
+      }
+      if(cb) cb();
+    }, function(){ window._ggFbSynced = true; if(cb) cb(); });
+  } else {
+    window._ggFbSynced = true;
+    if(cb) cb();
+  }
+}
+
+async function _ggSave(){
+  _lastGGSaveAt = Date.now();
+  await _ggWaitSync();
+  try{ localStorage.setItem(GG_KEY, JSON.stringify(window._ggData)); }catch(e){}
+  if(window._fbDb && window._fbRef && window._fbSet){
+    try{ await window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/gelir_gider'), window._ggData); }catch(e){ console.warn('Gelir-Gider kayıt hatası:', e); }
+  }
+}
+
+function _ggMonthLabel(key){
+  var p = key.split('-');
+  return GG_AYLAR[parseInt(p[1],10)-1] + ' ' + p[0];
+}
+
+function _ggChangeMonth(delta){
+  var p = window._ggActiveAy.split('-');
+  var y = parseInt(p[0],10), m = parseInt(p[1],10) - 1 + delta;
+  y += Math.floor(m/12); m = ((m%12)+12)%12;
+  window._ggActiveAy = y + '-' + String(m+1).padStart(2,'0');
+  _ggRenderAy();
+}
+
+function openGelirGiderModal(){
+  if(typeof _pwVerified!=='undefined' && !_pwVerified){
+    document.getElementById('password-screen').style.display='flex'; return;
+  }
+  if(!window._ggActiveAy){
+    var now = new Date();
+    window._ggActiveAy = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  }
+  _ggLoad(function(){ _ggOpenEkran(); });
+}
+
+function _ggOpenEkran(){
+  var old = document.getElementById('gg-screen');
+  if(old) old.parentNode.removeChild(old);
+
+  var scr = document.createElement('div');
+  scr.id = 'gg-screen';
+  scr.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:#060810;display:flex;flex-direction:column;overflow-y:auto;font-family:Outfit,sans-serif;';
+  scr.innerHTML =
+    '<div style="background:#0a0f1c;position:sticky;top:0;z-index:2;border-bottom:1px solid rgba(255,255,255,.08);">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;flex-wrap:wrap;gap:10px;">'
+        +'<div style="display:flex;align-items:center;gap:12px;">'
+          +'<button onclick="_ggClose()" style="width:36px;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;">←</button>'
+          +'<div>'
+            +'<div style="font-family:Syne,sans-serif;font-size:17px;font-weight:900;color:#fff;">Gelir-Gider Takibi</div>'
+            +'<div style="font-size:11px;color:rgba(255,255,255,.35);">Aylık hesap bazlı özet</div>'
+          +'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:8px;">'
+          +'<input type="file" id="gg-import-file" accept=".xlsx,.xls" style="display:none;" onchange="_ggImportExcel(event)">'
+          +'<button onclick="document.getElementById(\'gg-import-file\').click()" style="padding:9px 14px;border-radius:9px;border:1px solid rgba(45,212,191,.3);background:rgba(45,212,191,.08);color:#2dd4bf;font-size:12px;font-weight:700;cursor:pointer;">📥 Excel\'den İçe Aktar</button>'
+          +'<button onclick="_ggExportExcel()" style="padding:9px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">📤 Excel\'e Aktar</button>'
+        +'</div>'
+      +'</div>'
+    +'</div>'
+    +'<div style="padding:18px 20px 60px;max-width:900px;width:100%;margin:0 auto;box-sizing:border-box;">'
+      +'<div id="gg-month-nav" style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:18px;"></div>'
+      +'<div id="gg-totals" style="margin-bottom:18px;"></div>'
+      +'<div id="gg-body"></div>'
+    +'</div>';
+  document.body.appendChild(scr);
+  _ggRenderAy();
+}
+
+function _ggClose(){
+  var scr = document.getElementById('gg-screen');
+  if(scr) scr.parentNode.removeChild(scr);
+}
+
+function _ggRenderAy(){
+  var ay = window._ggActiveAy;
+  var nav = document.getElementById('gg-month-nav');
+  if(nav){
+    nav.innerHTML =
+      '<button onclick="_ggChangeMonth(-1)" style="width:34px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;font-size:16px;">‹</button>'
+      +'<div style="font-family:Syne,sans-serif;font-size:16px;font-weight:800;color:#fff;min-width:160px;text-align:center;">'+_ggMonthLabel(ay)+'</div>'
+      +'<button onclick="_ggChangeMonth(1)" style="width:34px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;font-size:16px;">›</button>';
+  }
+
+  var data = window._ggData[ay] || {};
+  var hesaplar = Object.values(data).filter(function(r){ return r.grup !== 'servis'; }).sort(function(a,b){ return (a.ts||0)-(b.ts||0); });
+  var servisler = Object.values(data).filter(function(r){ return r.grup === 'servis'; }).sort(function(a,b){ return (a.ts||0)-(b.ts||0); });
+
+  function toplam(list){
+    var g=0, gd=0;
+    list.forEach(function(r){ g += Number(r.gelir||0); gd += Number(r.gider||0); });
+    return { gelir:g, gider:gd, net:g-gd };
+  }
+  var tH = toplam(hesaplar), tS = toplam(servisler);
+  var tAll = { gelir: tH.gelir+tS.gelir, gider: tH.gider+tS.gider, net: tH.net+tS.net };
+
+  var totalsEl = document.getElementById('gg-totals');
+  if(totalsEl){
+    totalsEl.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">'
+        +'<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:12px;padding:14px;text-align:center;">'
+          +'<div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;">TOPLAM GELİR</div>'
+          +'<div style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:#4ade80;">₺'+tAll.gelir.toLocaleString('tr-TR')+'</div>'
+        +'</div>'
+        +'<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:14px;text-align:center;">'
+          +'<div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;">TOPLAM GİDER</div>'
+          +'<div style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:#f87171;">₺'+tAll.gider.toLocaleString('tr-TR')+'</div>'
+        +'</div>'
+        +'<div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:12px;padding:14px;text-align:center;">'
+          +'<div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;">NET</div>'
+          +'<div style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:'+(tAll.net>=0?'#60a5fa':'#f87171')+';">₺'+tAll.net.toLocaleString('tr-TR')+'</div>'
+        +'</div>'
+      +'</div>';
+  }
+
+  function tabloHtml(baslik, list, grup, tp){
+    var rowsHtml = list.map(function(r){
+      var net = Number(r.gelir||0) - Number(r.gider||0);
+      return '<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);">'
+        +'<input value="'+escHtml(r.isim||'')+'" placeholder="Hesap adı" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'isim\',this.value)" style="flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:7px 9px;color:#fff;font-size:12px;">'
+        +'<input type="number" value="'+(r.gelir||'')+'" placeholder="Gelir" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'gelir\',this.value)" style="width:90px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:7px;padding:7px 9px;color:#4ade80;font-size:12px;">'
+        +'<input type="number" value="'+(r.gider||'')+'" placeholder="Gider" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'gider\',this.value)" style="width:90px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:7px;padding:7px 9px;color:#f87171;font-size:12px;">'
+        +'<div style="width:80px;text-align:right;font-size:12px;font-weight:700;color:'+(net>=0?'#60a5fa':'#f87171')+';">₺'+net.toLocaleString('tr-TR')+'</div>'
+        +'<button onclick="_ggDeleteRow(\''+ay+'\',\''+r.id+'\')" style="width:28px;height:28px;flex-shrink:0;border-radius:7px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:#f87171;cursor:pointer;font-size:14px;">×</button>'
+      +'</div>';
+    }).join('');
+    return '<div style="background:#0e1420;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:16px;margin-bottom:14px;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+        +'<div style="font-family:Syne,sans-serif;font-size:13px;font-weight:800;color:#fff;">'+baslik+'</div>'
+        +'<div style="font-size:11px;color:rgba(255,255,255,.35);">Gelir ₺'+tp.gelir.toLocaleString('tr-TR')+' · Gider ₺'+tp.gider.toLocaleString('tr-TR')+' · Net ₺'+tp.net.toLocaleString('tr-TR')+'</div>'
+      +'</div>'
+      +(rowsHtml || '<div style="text-align:center;padding:20px;color:rgba(255,255,255,.25);font-size:12px;">Henüz kayıt yok.</div>')
+      +'<button onclick="_ggAddRow(\''+ay+'\',\''+grup+'\')" style="margin-top:10px;width:100%;padding:8px;border-radius:8px;border:1px dashed rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.4);font-size:12px;cursor:pointer;">+ Satır Ekle</button>'
+    +'</div>';
+  }
+
+  var body = document.getElementById('gg-body');
+  if(body){
+    body.innerHTML = tabloHtml('📋 Hesaplar', hesaplar, 'hesap', tH) + tabloHtml('🚌 Servisciler / Personel', servisler, 'servis', tS);
+  }
+}
+
+let _ggSaveTimer = null;
+function _ggField(ay, id, field, value){
+  if(!window._ggData[ay]) window._ggData[ay] = {};
+  if(!window._ggData[ay][id]) window._ggData[ay][id] = {id:id, isim:'', gelir:0, gider:0, grup:'hesap', ts:Date.now()};
+  window._ggData[ay][id][field] = (field==='gelir'||field==='gider') ? (Number(value)||0) : value;
+  // Toplamlar/net anlık güncellensin ama her tuşta tüm listeyi yeniden çizip
+  // input focus'unu kaybettirmeyelim — sadece kaydetmeyi geciktir (debounce)
+  clearTimeout(_ggSaveTimer);
+  _ggSaveTimer = setTimeout(function(){ _ggSave(); _ggRenderAy(); }, 600);
+}
+
+function _ggAddRow(ay, grup){
+  if(!window._ggData[ay]) window._ggData[ay] = {};
+  var id = 'gg_' + Date.now().toString(36) + Math.random().toString(36).substr(2,4);
+  window._ggData[ay][id] = {id:id, isim:'', gelir:0, gider:0, grup:grup, ts:Date.now()};
+  _ggSave();
+  _ggRenderAy();
+}
+
+function _ggDeleteRow(ay, id){
+  if(!window._ggData[ay] || !window._ggData[ay][id]) return;
+  if(!confirm('Bu satırı silmek istediğinize emin misiniz?')) return;
+  delete window._ggData[ay][id];
+  _ggSave();
+  _ggRenderAy();
+}
+
+function _ggExportExcel(){
+  _ensureXLSX(function(){
+    var wb = XLSX.utils.book_new();
+    var aylar = Object.keys(window._ggData).sort();
+    if(!aylar.length){ toast('Dışa aktarılacak veri yok','error'); return; }
+    aylar.forEach(function(ay){
+      var data = window._ggData[ay] || {};
+      var hesaplar = Object.values(data).filter(function(r){return r.grup!=='servis';}).sort(function(a,b){return(a.ts||0)-(b.ts||0);});
+      var servisler = Object.values(data).filter(function(r){return r.grup==='servis';}).sort(function(a,b){return(a.ts||0)-(b.ts||0);});
+      var rows = [['SR','HESAP','GELİR','GİDER','NET']];
+      hesaplar.forEach(function(r,i){ rows.push([i+1, r.isim||'', r.gelir||0, r.gider||0, (r.gelir||0)-(r.gider||0)]); });
+      rows.push(['','','','','']);
+      servisler.forEach(function(r,i){ rows.push([i+1, r.isim||'', r.gelir||0, r.gider||0, (r.gelir||0)-(r.gider||0)]); });
+      var sheetName = _ggMonthLabel(ay).substring(0,31);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), sheetName);
+    });
+    XLSX.writeFile(wb, 'Gelir_Gider_'+new Date().toISOString().split('T')[0]+'.xlsx');
+    toast('Excel indirildi','success');
+  });
+}
+
+function _ggImportExcel(event){
+  var file = event.target.files[0];
+  if(!file) return;
+  event.target.value = '';
+  var yilInput = prompt('Bu Excel dosyasındaki "1.AY, 2.AY..." sekmeleri hangi yıla ait? (örn. 2026)', new Date().getFullYear());
+  if(!yilInput) return;
+  var yil = parseInt(yilInput, 10);
+  if(!yil || yil < 2000 || yil > 2100){ toast('Geçersiz yıl','error'); return; }
+
+  _ensureXLSX(function(){
+    var reader = new FileReader();
+    reader.onload = async function(e){
+      try{
+        var data = new Uint8Array(e.target.result);
+        var workbook = XLSX.read(data, {type:'array', cellDates:false, cellText:false});
+        var added = 0, sheetsread = 0;
+
+        workbook.SheetNames.forEach(function(sheetName){
+          // Sekme adından ay numarasını çıkar: "1.AY", "1. AY", "OCAK" vb. destekle
+          var ayNo = null;
+          var mAy = sheetName.match(/^\s*(\d{1,2})\s*\.?\s*AY/i);
+          if(mAy) ayNo = parseInt(mAy[1], 10);
+          else {
+            var idx = GG_AYLAR.findIndex(function(a){ return a.toUpperCase() === sheetName.trim().toUpperCase(); });
+            if(idx >= 0) ayNo = idx + 1;
+          }
+          if(!ayNo || ayNo < 1 || ayNo > 12) return; // ilgisiz sekme (özet/not vb.) — atla
+
+          var ws = workbook.Sheets[sheetName];
+          var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+          if(!rows || rows.length < 2) return;
+
+          // Başlık satırını bul (HESAP/GELİR/GİDER içeren)
+          var hStart = -1, isimCol=1, gelirCol=2, giderCol=3, srCol=0;
+          for(var ri=0; ri<Math.min(5,rows.length); ri++){
+            var rowU = rows[ri].map(function(v){ return (v||'').toString().toUpperCase().trim(); });
+            if(rowU.indexOf('HESAP')>=0 && rowU.indexOf('GELİR')>=0){
+              hStart = ri+1;
+              isimCol = rowU.indexOf('HESAP');
+              gelirCol = rowU.indexOf('GELİR');
+              giderCol = rowU.indexOf('GİDER'); if(giderCol<0) giderCol = rowU.indexOf('GIDER');
+              srCol = rowU.indexOf('SR'); if(srCol<0) srCol = 0;
+              break;
+            }
+          }
+          if(hStart < 0) return;
+
+          var ayKey = yil + '-' + String(ayNo).padStart(2,'0');
+          if(!window._ggData[ayKey]) window._ggData[ayKey] = {};
+          var hid = Object.keys(window._ggData[ayKey]).length + 1;
+          var grup = 'hesap', lastSr = 0;
+
+          for(var ri2=hStart; ri2<rows.length; ri2++){
+            var hr = rows[ri2];
+            var isim = (hr[isimCol]||'').toString().trim();
+            var gelirRaw = hr[gelirCol], giderRaw = hr[giderCol];
+            var gelirV = typeof gelirRaw==='number' ? gelirRaw : parseFloat((gelirRaw||'0').toString().replace(/[^0-9.-]/g,''))||0;
+            var giderV = typeof giderRaw==='number' ? giderRaw : parseFloat((giderRaw||'0').toString().replace(/[^0-9.-]/g,''))||0;
+            if(!isim && gelirV===0 && giderV===0) continue; // boş satır
+
+            var srRaw = hr[srCol];
+            var srNum = srRaw!=null ? parseInt(srRaw,10) : NaN;
+            // SR sütunu 1'e resetlendiyse (14 → 1 gibi) yeni bölüm (Servisciler) başlamış demektir
+            if(!isNaN(srNum) && srNum===1 && lastSr>1) grup = 'servis';
+            if(!isNaN(srNum)) lastSr = srNum;
+
+            if(!isim) continue; // isimsiz satırı kayıt olarak eklemeye gerek yok
+
+            var rid = 'gg_xl_' + ayKey.replace('-','') + '_' + String(hid).padStart(4,'0');
+            window._ggData[ayKey][rid] = {id:rid, isim:isim, gelir:gelirV, gider:giderV, grup:grup, ts:hid};
+            hid++; added++;
+          }
+          sheetsread++;
+        });
+
+        if(!sheetsread){ toast('Uygun ay sekmesi bulunamadı (ör. "1.AY", "Ocak")','error'); return; }
+        await _ggSave();
+        _ggRenderAy();
+        toast('✅ '+added+' kayıt aktarıldı ('+sheetsread+' ay)','success');
+      }catch(err){
+        console.error('Gelir-Gider Excel import hatası:', err);
+        toast('Excel okuma hatası: '+(err.message||'bilinmeyen'),'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 </script>
 
 </body>
