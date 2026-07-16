@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-37</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-38</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -15145,6 +15145,12 @@ function _toggleCariBakiye(){
 // ═══════════════════════════════════════════════════
 window._trash = [];
 const TRASH_MAX = 999999; // Max 30 kayıt sakla
+// RACE CONDITION KORUMASI — Cari/Şoför/Görev/Gelir-Gider modüllerindeki aynı hata
+// burada da mümkündü: bir öğe çöp kutusundan silindiğinde, dinleyicinin (onValue)
+// az önce gelen gecikmeli/eski bir anlık görüntüyü uygulayıp silinen öğeyi geri
+// getirmesi. Eski "uzunluk daha büyükse kabul et" sezgisel kontrolü bunu tam
+// engellemiyordu; zaman damgalı kilit ekleniyor.
+let _lastTrashSaveAt = 0;
 
 function _trashAdd(type, id, data) {
   window._trash.unshift({
@@ -15168,6 +15174,7 @@ function _trashLabel(type, data) {
 }
 
 function _trashSave() {
+  _lastTrashSaveAt = Date.now();
   try { localStorage.setItem('konseltur_trash_v1', JSON.stringify(window._trash)); } catch(e) {}
   // Firebase'e de kaydet
   if(window._fbReady && window._fbDb && window._fbSet && window._fbRef){
@@ -15181,9 +15188,14 @@ function _trashLoad() {
     window._trash = raw ? JSON.parse(raw) : [];
   } catch(e) { window._trash = []; }
   // Firebase'den yükle — daha fazla veri orada olabilir
+  const reqTime = Date.now();
   const _doTrashLoad = () => {
     if(!window._fbDb) return;
     window._fbOnValue(window._fbRef(window._fbDb,'konseltur/GLOBAL/trash'), snap => {
+      // Yarış durumu koruması: bu dinleyici kurulduktan SONRA yerel bir silme/ekleme
+      // yapıldıysa, gelen anlık görüntü muhtemelen eski/gecikmelidir — üzerine yazma
+      // (silinen bir öğenin geri gelmesi hatasının kök nedeni buydu)
+      if(_lastTrashSaveAt > reqTime) return;
       if(snap && snap.exists()){
         const fb = snap.val();
         if(Array.isArray(fb) && fb.length > (window._trash||[]).length){
@@ -17499,16 +17511,12 @@ function _ggLoad(cb){
         if(d && typeof d==='object'){
           window._ggData = Object.assign({}, window._ggData, d);
           try{ localStorage.setItem(GG_KEY, JSON.stringify(window._ggData)); }catch(e){}
-          // ÖNEMLİ: İlk gerçek Firebase senkronizasyonu ağ gecikmesiyle (bazen 1-2 saniye)
-          // gelir. Kullanıcı modal açılır açılmaz yazmaya başlarsa, bu gecikmeli veri tam
-          // o sırada gelip listeyi yeniden çizerek yazdığı kutunun odağını kaybettirebilir
-          // ("biraz bekleyince yazamıyorum" hatası buydu — debounce'tan değil, buradan
-          // kaynaklanıyordu). Kullanıcı o an bir gg alanına yazıyorsa, ekranı yeniden çizme;
-          // veri zaten güncellendi, ekran bir sonraki doğal etkileşimde (satır ekle/sil,
-          // ay değiştir vb.) kendiliğinden güncel halini gösterecek.
-          var _aktif = document.activeElement;
-          var _yaziyor = window._ggIsEditing || (_aktif && _aktif.tagName === 'INPUT' && _aktif.closest && _aktif.closest('#gg-body'));
-          if(!_yaziyor && document.getElementById('gg-screen') && window._ggActiveAy) _ggRenderAy();
+          // KESİN ÇÖZÜM: Ekran açıkken uzaktan gelen veri ARTIK HİÇBİR KOŞULDA ekranı
+          // otomatik yeniden çizmez ("yazıyor mu" kontrolü zamanlamaya bağlıydı ve
+          // bazı durumları kaçırabiliyordu — bu daha önceki düzeltmelerin neden
+          // yetersiz kaldığıydı). Veri arka planda sessizce güncellenir; ekran bir
+          // sonraki doğal etkileşimde (ay değiştir, satır ekle/sil, ekranı kapatıp
+          // yeniden aç) kendiliğinden güncel halini gösterir. Yazarken kesinti YOK.
         }
       }
       if(cb) cb();
