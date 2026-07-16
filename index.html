@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-34</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-35</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17598,22 +17598,28 @@ function _ggFormatNum(raw){
 
 // Sayı alanına yazarken binlik nokta ayracını canlı uygular, imleç konumunu korur
 function _ggOnAmountInput(el, ay, id, field){
-  var cursorPos = el.selectionStart;
-  var oldVal = el.value;
-  var digitsBeforeCursor = oldVal.slice(0, cursorPos).replace(/[^0-9]/g,'').length;
-  var digits = oldVal.replace(/[^0-9]/g,'');
-  var formatted = _ggFormatNum(digits);
-  el.value = formatted;
-  var count = 0, newPos = formatted.length;
-  if(digitsBeforeCursor === 0){ newPos = 0; }
-  else {
-    for(var i=0;i<formatted.length;i++){
-      if(/[0-9]/.test(formatted[i])) count++;
-      if(count === digitsBeforeCursor){ newPos = i+1; break; }
+  try{
+    var cursorPos = el.selectionStart;
+    var oldVal = el.value;
+    var digitsBeforeCursor = oldVal.slice(0, cursorPos).replace(/[^0-9]/g,'').length;
+    var digits = oldVal.replace(/[^0-9]/g,'');
+    var formatted = _ggFormatNum(digits);
+    el.value = formatted;
+    var count = 0, newPos = formatted.length;
+    if(digitsBeforeCursor === 0){ newPos = 0; }
+    else {
+      for(var i=0;i<formatted.length;i++){
+        if(/[0-9]/.test(formatted[i])) count++;
+        if(count === digitsBeforeCursor){ newPos = i+1; break; }
+      }
     }
+    if(typeof el.setSelectionRange === 'function'){
+      try{ el.setSelectionRange(newPos, newPos); }catch(selErr){ console.warn('GG setSelectionRange hatası:', selErr); }
+    }
+    _ggField(ay, id, field, digits);
+  }catch(err){
+    console.error('GG _ggOnAmountInput hatası:', err);
   }
-  el.setSelectionRange(newPos, newPos);
-  _ggField(ay, id, field, digits);
 }
 
 function _ggNetOf(r){ return Number(r.gelir||0) - Number(r.gider||0); }
@@ -17685,8 +17691,8 @@ function _ggRenderAy(){
   var body = document.getElementById('gg-body');
   if(body){
     body.innerHTML =
-      tabloHtml('📋 Hesaplar', hesaplar, 'hesap', tH, 'Gelir', {bg:'rgba(34,197,94,.06)', border:'rgba(34,197,94,.15)', text:'#4ade80'})
-      + tabloHtml('🚌 Servisciler / Personel', servisler, 'servis', tS, 'Gider', {bg:'rgba(239,68,68,.06)', border:'rgba(239,68,68,.15)', text:'#f87171'});
+      tabloHtml('📋 Gelir <span style="font-weight:400;color:rgba(255,255,255,.3);">(Hesaplar)</span>', hesaplar, 'hesap', tH, 'Gelir', {bg:'rgba(34,197,94,.06)', border:'rgba(34,197,94,.15)', text:'#4ade80'})
+      + tabloHtml('🚌 Gider <span style="font-weight:400;color:rgba(255,255,255,.3);">(Servisciler / Personel)</span>', servisler, 'servis', tS, 'Gider', {bg:'rgba(239,68,68,.06)', border:'rgba(239,68,68,.15)', text:'#f87171'});
   }
 }
 
@@ -17697,6 +17703,7 @@ let _ggSaveTimer = null;
 // _ggRenderAy() burada ASLA çağrılmaz — çağrılırsa kullanıcı yazarken input
 // yeniden oluşturulur ve imleç/odak kaybolur (bildirilen hata tam olarak buydu).
 function _ggField(ay, id, field, value){
+ try{
   if(!window._ggData[ay]) window._ggData[ay] = {};
   if(!window._ggData[ay][id]) window._ggData[ay][id] = {id:id, isim:'', gelir:0, gider:0, grup:'hesap', ts:Date.now()};
   var rec = window._ggData[ay][id];
@@ -17729,6 +17736,9 @@ function _ggField(ay, id, field, value){
 
   clearTimeout(_ggSaveTimer);
   _ggSaveTimer = setTimeout(function(){ _ggSave(); }, 600);
+ }catch(err){
+  console.error('GG _ggField hatası:', err, {ay:ay, id:id, field:field, value:value});
+ }
 }
 
 function _ggAddRow(ay, grup){
