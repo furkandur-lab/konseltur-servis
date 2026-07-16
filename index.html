@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.10-26</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.16-27</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -9268,9 +9268,11 @@ function renderUcretGenel(){
  // Şoförlere kayıtlı toplam öğrenci sayısını al
  const _ugSchIdx=getSchoolIdx(_activeSchoolKey);
  const _ugSch=SCHOOLS[_ugSchIdx]; const _ugCol=SC[_ugSchIdx];
- const schoolStudents=students.filter(x=>x.school===_ugSchIdx);
 
  // Şoförlere kayıtlı benzersiz öğrencileri _soforOgrenciler'den al
+ // NOT: Rota Yönetimi'ndeki öğrenci sayısına ASLA geri düşülmez — Ücret Yönetimi
+ // ile Rota Yönetimi kasıtlı olarak ayrı tutulur. Sadece Ücret Yönetimi'nin kendi
+ // ekranından eklenen öğrenciler burada sayılır.
  const _so = window._soforOgrenciler || {};
  const soforOgrMap = {}; // id → öğrenci objesi
  Object.keys(_so).forEach(key => {
@@ -9278,10 +9280,10 @@ function renderUcretGenel(){
    (_so[key]||[]).forEach(o => { if(o&&o.id) soforOgrMap[o.id] = o; });
  });
  const soforOgrList = Object.values(soforOgrMap);
- const totalS = soforOgrList.length > 0 ? soforOgrList.length : schoolStudents.length;
+ const totalS = soforOgrList.length;
 
  // Ödeme hesaplamalarını şoförlere kayıtlı öğrencilerden yap
- const hesapListesi = soforOgrList.length > 0 ? soforOgrList : schoolStudents;
+ const hesapListesi = soforOgrList;
  let paidCount=0, totalAmount=0, unpaidCount=0;
  hesapListesi.forEach(s=>{
    // students array'inden tam objeyi al (kayitAy vb. için)
