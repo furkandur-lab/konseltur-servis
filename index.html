@@ -1587,7 +1587,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-43</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-44</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -16893,7 +16893,11 @@ function _bsvImportExcel(event){
         const sheetName = workbook.SheetNames.find(sn => sn.toUpperCase().includes('BAŞVURU'));
         if(!sheetName){ showToast('❌ Excel içinde "Başvuru" adlı bir sekme bulunamadı','error'); return; }
         const ws = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:false});
+        // raw:true — tarih hücrelerinin cellDates:true sayesinde gerçek Date nesnesi
+        // olarak gelmesini sağlar. raw:false kullanılsaydı tarihler ekrandaki gibi
+        // metne çevrilir (ör. "4/18/2025") ve tarih ayrıştırma bunu tanıyamazdı —
+        // "tarihler aktarılmadı" hatasının kök nedeni buydu.
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
         if(!rows || rows.length < 2){ showToast('❌ Sekme boş görünüyor','error'); return; }
 
         // Başlık satırını bul (ADI SOYADI geçen satır)
@@ -16934,11 +16938,25 @@ function _bsvImportExcel(event){
           let tarih = '';
           const tRaw = cols.tarih!==undefined ? row[cols.tarih] : null;
           if(tRaw instanceof Date && !isNaN(tRaw)){
+            // SheetJS cellDates:true ile üretilen Date nesnelerinde UTC bileşenleri
+            // Excel'deki tarihi doğru yansıtır (saat dilimi kaymasını önlemek için
+            // toISOString/UTC kullanılır, yerel saat değil)
             tarih = tRaw.toISOString().split('T')[0];
+          } else if(typeof tRaw === 'number' && tRaw > 0){
+            // Bazı dosyalarda tarih, Date nesnesine çevrilmeden ham Excel seri
+            // numarası olarak gelebilir (örn. 45770) — bunu da tarihe çevir
+            const parsed = XLSX.SSF ? XLSX.SSF.parse_date_code(tRaw) : null;
+            if(parsed){
+              tarih = parsed.y + '-' + String(parsed.m).padStart(2,'0') + '-' + String(parsed.d).padStart(2,'0');
+            }
           } else if(tRaw){
             const s = tRaw.toString().trim();
-            const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+            let m = s.match(/(\d{4})-(\d{2})-(\d{2})/); // YYYY-MM-DD
             if(m) tarih = m[0];
+            else {
+              m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/); // DD.MM.YYYY veya DD/MM/YYYY
+              if(m) tarih = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+            }
           }
 
           const durumRaw = cols.durum!==undefined ? (row[cols.durum]||'').toString().trim().toUpperCase() : '';
