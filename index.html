@@ -1632,7 +1632,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-58</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-59</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -4129,7 +4129,7 @@ setInterval(updateLoginClock, 30000);
        </div>
        <div class="field">
          <label>💰 Aylık Ücret (₺)</label>
-         <input id="yeni-ogrenci-aylik-ucret" type="number" min="0" step="50" placeholder="Örn: 1500"
+         <input id="yeni-ogrenci-aylik-ucret" type="text" inputmode="decimal" oninput="_formatMoneyInput(this)" placeholder="Örn: 1.500"
            style="width:100%;padding:9px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:Outfit,sans-serif;outline:none;box-sizing:border-box;">
        </div>
        <button onclick="ucretYeniOgrenciEkle()"
@@ -12247,7 +12247,7 @@ function ucretYeniOgrenciEkle(){
   const sinif   = (document.getElementById('yeni-ogrenci-sinif').value||'').trim();
   const okulIdx = parseInt(document.getElementById('yeni-ogrenci-okul').value||'0');
   const kayitAy = document.getElementById('yeni-ogrenci-kayit-ay').value||'';
-  const aylikUcret = parseFloat(document.getElementById('yeni-ogrenci-aylik-ucret')?.value||'0')||0;
+  const aylikUcret = _parseMoneyInput(document.getElementById('yeni-ogrenci-aylik-ucret')?.value||'0')||0;
 
   // Yeni öğrenci oluştur - ID unique olsun
   const ID_OFFSET = okulIdx * 100000;
@@ -13001,7 +13001,7 @@ function openEditSoforModal(id){
 function _soforModalFill(s){
   document.getElementById('sam-name').value = s?s.name:'';
   document.getElementById('sam-ph').value = s?s.ph:'';
-  const maasEl2 = document.getElementById('sam-maas'); if(maasEl2) maasEl2.value = s?(s.maas||25000):25000;
+  const maasEl2 = document.getElementById('sam-maas'); if(maasEl2) maasEl2.value = _toMoneyStr(s?(s.maas||25000):25000);
   document.getElementById('sam-plaka').value = s?s.plaka:'';
   document.getElementById('sam-tip').value = s?s.tip:'kadro';
   document.getElementById('sam-color').value = s?s.color:'#8b5cf6';
@@ -13058,7 +13058,7 @@ function saveSoforModal(){
   const ph    = document.getElementById('sam-ph').value.trim();
   const plaka = document.getElementById('sam-plaka').value.trim().toUpperCase();
   const color = document.getElementById('sam-color').value;
-  const maas  = tip==='kadro' ? (parseInt(document.getElementById('sam-maas')?.value)||25000) : 0;
+  const maas  = tip==='kadro' ? (_parseMoneyInput(document.getElementById('sam-maas')?.value)||25000) : 0;
 
   // Taşeron: okul-yövmiye satırlarını topla
   let okulYovmiye = [];
@@ -13914,7 +13914,7 @@ function openSoforPayModal(soforId, ayKey, ayLabel, beklenen){
 
   // Yeni ödeme tutar input'u sıfırla
   const tutarEl = document.getElementById('spm-tutar');
-  if(tutarEl) tutarEl.value = kalan2>0?kalan2:'';
+  if(tutarEl) tutarEl.value = kalan2>0?_toMoneyStr(kalan2):'';
   const notEl = document.getElementById('spm-not');
   if(notEl) notEl.value = '';
   const acEl = document.getElementById('spm-ekstra-aciklama');
@@ -14040,7 +14040,7 @@ function saveSoforPayModal(){
   if(!soforPayments[id][ay]) soforPayments[id][ay]={islemler:[],ekstra:[]};
 
   const tip = document.getElementById('spm-tip').value;
-  const tutar = parseFloat(document.getElementById('spm-tutar').value)||0;
+  const tutar = _parseMoneyInput(document.getElementById('spm-tutar').value)||0;
 
   // Ekstra iş açıklamasını not olarak kullan
   let not2 = (document.getElementById('spm-not').value||'').trim();
@@ -14118,7 +14118,7 @@ function editIslem(soforId, ayKey, idx){
   window._editIslemIdx = idx;
   window._editIslemTip = 'islem';
   // Input'ları doldur
-  document.getElementById('spm-tutar').value = ix.tutar||'';
+  document.getElementById('spm-tutar').value = ix.tutar?_toMoneyStr(ix.tutar):'';
   document.getElementById('spm-not').value = ix.not||'';
   _setSpmTip(ix.tip, document.querySelector(`#spm-tip-grid [data-tip="${ix.tip}"]`));
   // Kaydet butonunu düzenleme moduna al
@@ -14132,7 +14132,7 @@ function editEkstra(soforId, ayKey, idx){
   if(!ex) return;
   window._editIslemIdx = idx;
   window._editIslemTip = 'ekstra';
-  document.getElementById('spm-tutar').value = ex.tutar||'';
+  document.getElementById('spm-tutar').value = ex.tutar?_toMoneyStr(ex.tutar):'';
   const acEl = document.getElementById('spm-ekstra-aciklama');
   if(acEl) acEl.value = ex.aciklama||'';
   document.getElementById('spm-not').value = '';
@@ -14187,7 +14187,7 @@ function _setPayBtnEditMode(editing){
     </div>
     <div id="sam-kadro-section" style="display:none;margin-bottom:10px;">
       <div style="font-size:11px;color:var(--muted2);margin-bottom:5px;font-weight:600;">Aylık Maaş (₺) *</div>
-      <input id="sam-maas" type="number" min="0" step="1" max="9999999" placeholder="25000" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:var(--text);font-size:13px;outline:none;font-family:'Outfit',sans-serif;transition:border-color .2s;" onfocus="this.style.borderColor='rgba(139,92,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.09)'">
+      <input id="sam-maas" type="text" inputmode="decimal" oninput="_formatMoneyInput(this)" placeholder="25.000" style="width:100%;padding:9px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:9px;color:var(--text);font-size:13px;outline:none;font-family:'Outfit',sans-serif;transition:border-color .2s;" onfocus="this.style.borderColor='rgba(139,92,246,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.09)'">
     </div>
     <div id="sam-taseron-section" style="display:none;margin-bottom:12px;">
       <div style="font-size:11px;color:var(--muted2);margin-bottom:8px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;">Okul Bazlı Yövmiye</div>
@@ -14262,7 +14262,7 @@ function _setPayBtnEditMode(editing){
       <!-- Tutar -->
       <div style="margin-bottom:10px;">
         <div style="font-size:10px;color:rgba(255,255,255,.3);font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;">Tutar (₺)</div>
-        <input id="spm-tutar" type="number" placeholder="0" min="1" step="1" max="9999999" class="pmi-input" style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:var(--green);">
+        <input id="spm-tutar" type="text" inputmode="decimal" oninput="_formatMoneyInput(this)" placeholder="0" class="pmi-input" style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:var(--green);">
       </div>
 
       <!-- Not -->
@@ -14469,18 +14469,21 @@ document.addEventListener('DOMContentLoaded',function(){
     <!-- Tutar -->
     <div class="field">
       <label>Tutar (₺)</label>
-      <input id="ch-tutar" type="number" placeholder="0 (boş bırakılabilir)" min="0" step="0.01" max="99999999" style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:#60a5fa;">
+      <input id="ch-tutar" type="text" inputmode="decimal" oninput="_formatMoneyInput(this)" placeholder="" min="0" style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:#60a5fa;">
     </div>
 
     <!-- Açıklama -->
-    <div class="field"><label>Açıklama</label><input id="ch-aciklama" maxlength="200" placeholder="Örn: Ocak ayı yevmiye, Avans..."></div>
+    <div class="field">
+      <label>Açıklama</label>
+      <input id="ch-aciklama" list="ch-aciklama-list" maxlength="200" placeholder="Örn: Ocak ayı yevmiye, Avans...">
+      <datalist id="ch-aciklama-list"></datalist>
+    </div>
 
     <!-- Karşı Hesap (sadece Kasa Cari için görünür) -->
     <div class="field" id="ch-karsi-hesap-field">
-      <label>Karşı Hesap <span style="font-weight:400;color:var(--muted);font-size:10px;">(opsiyonel — seçilirse otomatik yansır)</span></label>
-      <select id="ch-karsi-hesap" style="color-scheme:dark;background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;width:100%;font-family:Outfit,sans-serif;font-size:13px;outline:none;">
-        <option value="">— Karşı hesap seçin —</option>
-      </select>
+      <label>Karşı Hesap <span style="font-weight:400;color:var(--muted);font-size:10px;">(opsiyonel — yazarak arayabilir veya listeden seçebilirsiniz)</span></label>
+      <input id="ch-karsi-hesap" list="ch-karsi-hesap-list" placeholder="İsim yazın veya listeden seçin..." style="background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;width:100%;font-family:Outfit,sans-serif;font-size:13px;outline:none;box-sizing:border-box;">
+      <datalist id="ch-karsi-hesap-list"></datalist>
     </div>
 
     <!-- Kaydet -->
@@ -14626,6 +14629,44 @@ function _fmtPara(n){
   const abs = Math.abs(n);
   const s = abs.toLocaleString('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:2});
   return (n<0?'-':'') + '₺' + s;
+}
+
+// ── GENEL PARA GİRİŞİ BİÇİMLENDİRME ──
+// Herhangi bir tutar kutusuna oninput="_formatMoneyInput(this)" eklenerek kullanılır.
+// Yazarken otomatik binlik nokta ayracı ekler (200000 → 200.000), imleç konumunu korur.
+// Kaydedilirken _parseMoneyInput() ile noktalar temizlenip ham sayıya çevrilir —
+// veritabanındaki mevcut sayı formatına hiçbir şekilde dokunmaz.
+function _formatMoneyInput(el){
+  const cursorPos = el.selectionStart;
+  const oldVal = el.value;
+  const digitsBeforeCursor = oldVal.slice(0, cursorPos).replace(/[^0-9]/g,'').length;
+  const digits = oldVal.replace(/[^0-9]/g,'');
+  const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  el.value = formatted;
+  let count = 0, newPos = formatted.length;
+  if(digitsBeforeCursor === 0){ newPos = 0; }
+  else {
+    for(let i=0;i<formatted.length;i++){
+      if(/[0-9]/.test(formatted[i])) count++;
+      if(count === digitsBeforeCursor){ newPos = i+1; break; }
+    }
+  }
+  if(typeof el.setSelectionRange==='function'){
+    try{ el.setSelectionRange(newPos, newPos); }catch(e){}
+  }
+}
+// Ham bir sayıyı ("25000") noktalı gösterim metnine ("25.000") çevirir —
+// bir alanı JS ile programatik olarak DOLDURURKEN (kullanıcı yazmadan) kullanılır
+function _toMoneyStr(n){
+  if(n===null||n===undefined||n==='') return '';
+  const digits = Math.round(Number(n)||0).toString();
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+// Biçimlendirilmiş ("25.000") bir metni ham sayıya çevirir (25000)
+function _parseMoneyInput(val){
+  if(val===null || val===undefined) return 0;
+  const digits = val.toString().replace(/[^0-9]/g,'');
+  return digits ? parseInt(digits,10) : 0;
 }
 
 function renderCariListe(){
@@ -15245,29 +15286,45 @@ function openCariHareketModal(){
   // Karşı Hesap alanı sadece Kasa Cari'de görünsün
   const karsiField = document.getElementById('ch-karsi-hesap-field');
   if(karsiField) karsiField.style.display = _isKasa ? '' : 'none';
-  // Karşı hesap listesini doldur
-  const karsiSel = document.getElementById('ch-karsi-hesap');
-  if(karsiSel && _isKasa){
-    karsiSel.innerHTML = '<option value="">— Seçin (otomatik yansır) —</option>';
+  // Karşı hesap listesini (datalist) doldur — hem yazarak aranabilir hem seçilebilir.
+  // Datalist sadece metin taşıdığı için, kaydederken isimden ID'ye dönmek üzere ayrı
+  // bir eşleme tablosu (window._cariKarsiNameMap) tutuyoruz.
+  const karsiInput = document.getElementById('ch-karsi-hesap');
+  const karsiList = document.getElementById('ch-karsi-hesap-list');
+  window._cariKarsiNameMap = {};
+  if(karsiInput && karsiList && _isKasa){
+    karsiInput.value = '';
+    let optsHtml = '';
     Object.entries(_cariData).forEach(function(entry){
       const key = entry[0], c = entry[1];
-      // Aktif cari hariç hepsini ekle (hem key hem id ile kontrol)
-      if(key !== id && String(c.id) !== String(id)){
-        const opt = document.createElement('option');
-        opt.value = key;  // _cariData key'ini kullan - kesin eşleşme sağlar
-        opt.textContent = (c.kod?'['+c.kod+'] ':'')+c.isim;
-        karsiSel.appendChild(opt);
+      if(key !== id && String(c.id) !== String(id) && !c.arsiv && c.isim){
+        const label = (c.kod?'['+c.kod+'] ':'')+c.isim;
+        window._cariKarsiNameMap[label.toUpperCase()] = key;
+        window._cariKarsiNameMap[(c.isim||'').toUpperCase()] = key; // sade isimle de eşleşsin
+        optsHtml += '<option value="'+escHtml(label)+'"></option>';
       }
     });
-    // Karşı hesap seçilince açıklamaya adı yaz
-    karsiSel.onchange = function(){
-      const karsiC = _cariData[this.value];
+    karsiList.innerHTML = optsHtml;
+    // Karşı hesap yazılınca/seçilince açıklamaya adı yansısın
+    karsiInput.oninput = function(){
+      const karsiId = window._cariKarsiNameMap[this.value.trim().toUpperCase()];
+      const karsiC = karsiId ? _cariData[karsiId] : null;
       const acEl = document.getElementById('ch-aciklama');
       if(karsiC && acEl && !acEl.value){
-        // Açıklama boşsa karşı taraf adını yaz
         acEl.placeholder = karsiC.isim + ' ile işlem';
       }
     };
+  }
+  // Açıklama geçmişi (datalist) — bu carinin daha önce kullanılmış açıklamalarını
+  // yazarken süzerek önerir, tekrar tekrar aynı metni yazmaya gerek kalmaz
+  const acList = document.getElementById('ch-aciklama-list');
+  if(acList){
+    const gecmis = new Set();
+    Object.values(_aktifCari.hareketler||{}).forEach(function(h){
+      const a = (h.aciklama||'').trim();
+      if(a) gecmis.add(a);
+    });
+    acList.innerHTML = Array.from(gecmis).map(function(a){ return '<option value="'+escHtml(a)+'"></option>'; }).join('');
   }
   document.getElementById('ch-cari-label').textContent=_cariData[id].isim||'—';
   document.getElementById('ch-tarih').value=new Date().toISOString().split('T')[0];
@@ -15286,7 +15343,7 @@ function _setChTip(tip,btn){
 async function saveCariHareket(){
   const id=window._activeCariId;
   if(!id||!_cariData[id]) return;
-  const tutar=parseFloat(document.getElementById('ch-tutar').value)||0;
+  const tutar=_parseMoneyInput(document.getElementById('ch-tutar').value)||0;
   if(tutar<0){ showToast('Tutar negatif olamaz','error'); return; }
   const tip=document.getElementById('ch-tip').value;
   const tarih=document.getElementById('ch-tarih').value||new Date().toISOString().split('T')[0];
@@ -15295,13 +15352,19 @@ async function saveCariHareket(){
   const hid=_newHareketId();
   const hObj={tarih,aciklama:aciklama||(tip==='borc'?'Alınan':'Verilen'),borc:tip==='borc'?tutar:0,alacak:tip==='alacak'?tutar:0,ts:Date.now()};
   _cariData[id].hareketler[hid]=hObj;
-  // Karşı hesap seçilmişse oraya da ters hareket ekle (sadece Kasa Cari'de aktif)
+  // Karşı hesap seçilmişse oraya da ters hareket ekle (sadece Kasa Cari'de aktif).
+  // Karşı Hesap artık yazılabilir bir alan (datalist) — girilen ismi, modal açılırken
+  // oluşturulan isim→ID eşleme tablosundan (window._cariKarsiNameMap) çözüyoruz.
   const _isKasaCari = _cariData[id].tur === 'kasa';
-  const karsiSel = document.getElementById('ch-karsi-hesap');
-  const karsiId = (_isKasaCari && karsiSel) ? karsiSel.value : '';
+  const karsiInput = document.getElementById('ch-karsi-hesap');
+  const karsiText = (_isKasaCari && karsiInput) ? karsiInput.value.trim() : '';
+  const karsiId = karsiText ? (window._cariKarsiNameMap||{})[karsiText.toUpperCase()] : '';
   // _cariData'da bu ID var mı - string ve sayısal her iki formatta dene
   // karsiId artık _cariData key'i - direkt erişim
   const _karsiCari = karsiId ? _cariData[karsiId] : null;
+  if(karsiText && !_karsiCari){
+    showToast('⚠️ "'+karsiText+'" isimli bir hesap bulunamadı, karşı hesap bağlantısı olmadan kaydedildi','info');
+  }
   if(karsiId && _karsiCari){
     if(!_karsiCari.hareketler) _karsiCari.hareketler={};
     const karsiHid = _newHareketId()+'k';
@@ -17863,7 +17926,7 @@ function _openAracTakipEkran(){
         +'<button id="at-iptal" style="padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.5);font-size:13px;font-weight:700;cursor:pointer;">İptal</button>'
       +'</div>'
     +'</div>'
-    +'<div id="at-tab-araclar-content" style="display:block;">'+'<div id="at-liste" style="padding:16px 16px 60px;"></div>'+'</div>'+'<div id="at-tab-giderler-content" style="display:none;padding:16px;">'+'<div id="at-gider-form" style="display:none;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:14px;padding:16px;margin-bottom:16px;">'+'<div style="font-family:Syne,sans-serif;font-size:13px;font-weight:800;color:#fbbf24;margin-bottom:14px;">Gider Ekle</div>'+'<input type="hidden" id="at-gider-arac-id">'+'<div style="margin-bottom:10px;"><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">ARAÇ SEÇ</div>'+'<select id="at-gider-arac" style="width:100%;padding:10px 12px;background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:13px;font-family:Outfit,sans-serif;outline:none;color-scheme:dark;box-sizing:border-box;"></select></div>'+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+'<div><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">TARİH</div>'+'<input id="at-gider-tarih" type="date" style="width:100%;padding:10px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:13px;outline:none;color-scheme:dark;box-sizing:border-box;"></div>'+'<div><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">TUTAR (₺)</div>'+'<input id="at-gider-tutar" type="number" placeholder="0" style="width:100%;padding:10px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:13px;outline:none;box-sizing:border-box;"></div></div>'+'<div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">AÇIKLAMA *</div>'+'<textarea id="at-gider-aciklama" placeholder="Yağ ve filtre değişimi, lastik tamiri..." rows="2" style="width:100%;padding:10px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:13px;font-family:Outfit,sans-serif;outline:none;box-sizing:border-box;resize:none;"></textarea></div>'+'<div style="display:flex;gap:8px;">'+'<button id="at-gider-kaydet" style="padding:10px 22px;border-radius:9px;border:none;background:#f59e0b;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Kaydet</button>'+'<button id="at-gider-iptal" style="padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.5);font-size:13px;font-weight:700;cursor:pointer;">İptal</button>'+'</div></div>'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'+'<span style="font-family:Syne,sans-serif;font-size:13px;font-weight:800;color:#fff;">Gider Geçmişi</span>'+'<button id="at-gider-yeni-btn" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.08);color:#fbbf24;font-size:12px;font-weight:700;cursor:pointer;">+ Gider Ekle</button>'+'</div>'+'<div style="margin-bottom:10px;"><select id="at-gider-filtre" style="width:100%;padding:8px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#fff;font-size:12px;font-family:Outfit,sans-serif;outline:none;color-scheme:dark;">'+'<option value="">Tüm Araçlar</option>'+'</select></div>'+'<div id="at-gider-liste" style="padding-bottom:60px;"></div>'+'</div>';
+    +'<div id="at-tab-araclar-content" style="display:block;">'+'<div id="at-liste" style="padding:16px 16px 60px;"></div>'+'</div>'+'<div id="at-tab-giderler-content" style="display:none;padding:16px;">'+'<div id="at-gider-form" style="display:none;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:14px;padding:16px;margin-bottom:16px;">'+'<div style="font-family:Syne,sans-serif;font-size:13px;font-weight:800;color:#fbbf24;margin-bottom:14px;">Gider Ekle</div>'+'<input type="hidden" id="at-gider-arac-id">'+'<div style="margin-bottom:10px;"><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">ARAÇ SEÇ</div>'+'<select id="at-gider-arac" style="width:100%;padding:10px 12px;background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:13px;font-family:Outfit,sans-serif;outline:none;color-scheme:dark;box-sizing:border-box;"></select></div>'+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+'<div><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">TARİH</div>'+'<input id="at-gider-tarih" type="date" style="width:100%;padding:10px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:13px;outline:none;color-scheme:dark;box-sizing:border-box;"></div>'+'<div><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">TUTAR (₺)</div>'+'<input id="at-gider-tutar" type="text" inputmode="decimal" oninput="_formatMoneyInput(this)" placeholder="0" style="width:100%;padding:10px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:13px;outline:none;box-sizing:border-box;"></div></div>'+'<div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">AÇIKLAMA *</div>'+'<textarea id="at-gider-aciklama" placeholder="Yağ ve filtre değişimi, lastik tamiri..." rows="2" style="width:100%;padding:10px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:13px;font-family:Outfit,sans-serif;outline:none;box-sizing:border-box;resize:none;"></textarea></div>'+'<div style="display:flex;gap:8px;">'+'<button id="at-gider-kaydet" style="padding:10px 22px;border-radius:9px;border:none;background:#f59e0b;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Kaydet</button>'+'<button id="at-gider-iptal" style="padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.5);font-size:13px;font-weight:700;cursor:pointer;">İptal</button>'+'</div></div>'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'+'<span style="font-family:Syne,sans-serif;font-size:13px;font-weight:800;color:#fff;">Gider Geçmişi</span>'+'<button id="at-gider-yeni-btn" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.08);color:#fbbf24;font-size:12px;font-weight:700;cursor:pointer;">+ Gider Ekle</button>'+'</div>'+'<div style="margin-bottom:10px;"><select id="at-gider-filtre" style="width:100%;padding:8px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#fff;font-size:12px;font-family:Outfit,sans-serif;outline:none;color-scheme:dark;">'+'<option value="">Tüm Araçlar</option>'+'</select></div>'+'<div id="at-gider-liste" style="padding-bottom:60px;"></div>'+'</div>';
 
   document.body.appendChild(scr);
 
@@ -18013,7 +18076,7 @@ function _atGiderFormAc(giderId){
     if(g){
       document.getElementById('at-gider-arac').value = g.aracId||'';
       document.getElementById('at-gider-tarih').value = g.tarih||'';
-      document.getElementById('at-gider-tutar').value = g.tutar||'';
+      document.getElementById('at-gider-tutar').value = g.tutar?_toMoneyStr(g.tutar):'';
       document.getElementById('at-gider-aciklama').value = g.aciklama||'';
       form.setAttribute('data-edit-id', giderId);
     }
@@ -18033,7 +18096,7 @@ function _atGiderKaydet(){
   var aracId = document.getElementById('at-gider-arac').value;
   var tarih = document.getElementById('at-gider-tarih').value;
   var tutarRaw = document.getElementById('at-gider-tutar').value;
-  var tutar = parseFloat(tutarRaw)||0;
+  var tutar = _parseMoneyInput(tutarRaw)||0;
   var form = document.getElementById('at-gider-form');
   var editId = form.getAttribute('data-edit-id');
   var list = _loadGiderler();
