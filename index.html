@@ -1632,7 +1632,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-53</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-54</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -2641,7 +2641,7 @@ function _addManagedListener(target, event, handler, options) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Geri Yükle
           </button>
-          <button id="update-btn" onclick="forceUpdate()" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:rgba(255,255,255,.35);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;" onmouseover="this.style.color='rgba(255,255,255,.7)'" onmouseout="this.style.color='rgba(255,255,255,.35)'">
+          <button id="update-btn" onclick="forceUpdate()" title="Hem uygulamayı hem tüm verileri sunucudan yeniler" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:rgba(255,255,255,.35);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;" onmouseover="this.style.color='rgba(255,255,255,.7)'" onmouseout="this.style.color='rgba(255,255,255,.35)'">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             Güncelle
           </button>
@@ -4486,8 +4486,8 @@ function toggleSound(){
 function forceUpdate(){
  var btn = document.getElementById('update-btn');
  if(btn){ btn.textContent = '⏳'; btn.style.pointerEvents = 'none'; }
- 
- // 1. Service Worker cache'ini temizle
+
+ // 1. Service Worker cache'ini temizle (uygulama KODU güncellemesi için)
  if('caches' in window){
  caches.keys().then(function(names){
  return Promise.all(names.map(function(n){ return caches.delete(n); }));
@@ -4495,15 +4495,28 @@ function forceUpdate(){
  /* cache cleared */;
  });
  }
- 
+
  // 2. Service Worker'ı güncelle
  if('serviceWorker' in navigator){
  navigator.serviceWorker.getRegistrations().then(function(regs){
  regs.forEach(function(reg){ reg.update(); });
  });
  }
- 
- // 3. Sayfayı zorla yenile (cache bypass)
+
+ // 3. VERİ önbelleğini de temizle (Rota, Cari, Ücret, Şoför, Görevler, Çöp Kutusu) —
+ // böylece bu buton hem uygulama kodunu HEM de sunucudaki güncel veriyi tek seferde
+ // yeniler. İş Başvuruları ve Not Defteri BİLEREK dokunulmuyor — bunlar sadece bu
+ // cihazda saklanıyor, Firebase yedeği yok, temizlenirse kalıcı kaybolurlar.
+ try{
+   var clearPrefixes = ['konseltur_main_v2_','konseltur_pay_v2_','konseltur_cari_v1_','konseltur_sofor_v1_','konseltur_soforpay_v1_','konseltur_trash_v1','konseltur_gg_v1_','konseltur_gorev_v1_'];
+   Object.keys(localStorage).forEach(function(k){
+     if(clearPrefixes.some(function(p){ return k.indexOf(p)===0; })){
+       localStorage.removeItem(k);
+     }
+   });
+ }catch(e){ console.warn('Veri önbelleği temizleme hatası:', e); }
+
+ // 4. Sayfayı zorla yenile (cache bypass)
  setTimeout(function(){
  window.location.href = window.location.pathname + '?v=' + Date.now();
  }, 500);
