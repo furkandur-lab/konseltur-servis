@@ -1632,7 +1632,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-55</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-56</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -15382,7 +15382,7 @@ function _trashAdd(type, id, data) {
     label: _trashLabel(type, data)
   });
   // TRASH_MAX sınırı kaldırıldı
-  _trashSave();
+  _trashSave().catch(e=>console.warn('Çöp kutusuna ekleme sunucuya kaydedilemedi:', e));
   _trashUpdateBadge();
 }
 
@@ -15402,10 +15402,14 @@ async function _trashSave() {
   // Firebase'e de kaydet — TAMAMLANMASINI bekle. Önceden bu beklenmiyordu, bu yüzden
   // "Tümünü Temizle" dedikten hemen sonra "Güncelle"ye basılırsa, silme işlemi henüz
   // sunucuya ulaşmadan sayfa yenileniyor ve eski (silinmemiş) veri geri geliyordu.
-  if(window._fbReady && window._fbDb && window._fbSet && window._fbRef){
-    try{ await window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/trash'), window._trash||[]); }
-    catch(e){ console.warn('Çöp kutusu Firebase kayıt hatası:', e); }
+  // ÖNEMLİ: Artık hata YUTULMUYOR — çağıran fonksiyon (örn. _trashClearAll) bunu
+  // yakalayıp kullanıcıya GERÇEKTEN ne olduğunu (izin hatası, bağlantı yok vb.)
+  // gösterebilsin diye fırlatılıyor. Sessiz başarısızlık, "temizledim ama geri geldi"
+  // hatasının kök nedeniydi.
+  if(!window._fbReady || !window._fbDb || !window._fbSet || !window._fbRef){
+    throw new Error('Firebase hazır değil (internet bağlantısı veya oturum sorunu olabilir)');
   }
+  await window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/trash'), window._trash||[]);
 }
 
 function _trashLoad() {
@@ -15636,7 +15640,7 @@ async function _trashRestore(idx) {
       msg = '"' + (aracData.plaka||'Araç') + '" geri alındı';
     }
     window._trash.splice(idx, 1);
-    _trashSave();
+    await _trashSave();
     _trashUpdateBadge();
     _trashRender();
     if (msg) { if(typeof toast==='function') toast('✅ ' + msg,'success'); else if(typeof showToast==='function') showToast('✅ '+msg,'success'); }
@@ -15647,9 +15651,16 @@ async function _trashRestore(idx) {
 
 async function _trashDelete(idx) {
   window._trash.splice(idx, 1);
-  await _trashSave();
-  _trashUpdateBadge();
-  _trashRender();
+  try{
+    await _trashSave();
+    _trashUpdateBadge();
+    _trashRender();
+  }catch(e){
+    console.error('Çöp kutusu kaydı silinemedi:', e);
+    if(typeof toast==='function') toast('❌ Sunucuya kaydedilemedi: '+(e.message||'bilinmeyen hata')+' — internet bağlantınızı kontrol edin','error');
+    _trashUpdateBadge();
+    _trashRender();
+  }
 }
 
 async function _trashClearAll() {
@@ -15659,11 +15670,22 @@ async function _trashClearAll() {
   // veriyi geri getirmesin diye açıkça bekleme/tamamlanma göstergesi veriyoruz
   const clearBtn = document.getElementById('trash-clear-all-btn');
   if(clearBtn){ clearBtn.textContent = '⏳ Temizleniyor...'; clearBtn.disabled = true; }
-  await _trashSave();
-  _trashUpdateBadge();
-  _trashRender();
-  if(clearBtn){ clearBtn.textContent = 'Tümünü Temizle'; clearBtn.disabled = false; }
-  if(typeof toast==='function') toast('✅ Çöp kutusu tamamen temizlendi ve sunucuya kaydedildi','success');
+  try{
+    await _trashSave();
+    _trashUpdateBadge();
+    _trashRender();
+    if(clearBtn){ clearBtn.textContent = 'Tümünü Temizle'; clearBtn.disabled = false; }
+    if(typeof toast==='function') toast('✅ Çöp kutusu tamamen temizlendi ve sunucuya kaydedildi','success');
+  }catch(e){
+    // ÖNEMLİ: Daha önce bu hata sessizce yutuluyordu — hiçbir mesaj çıkmadan işlem
+    // "yapılmış gibi" görünüyor ama sunucuya hiç ulaşmıyordu. Artık açıkça gösteriliyor.
+    console.error('Çöp kutusu temizlenemedi:', e);
+    _trashUpdateBadge();
+    _trashRender();
+    if(clearBtn){ clearBtn.textContent = 'Tümünü Temizle'; clearBtn.disabled = false; }
+    if(typeof toast==='function') toast('❌ SUNUCUYA KAYDEDİLEMEDİ: '+(e.message||'bilinmeyen hata')+' — internet bağlantınızı kontrol edip tekrar deneyin','error');
+    else alert('Sunucuya kaydedilemedi: '+(e.message||'bilinmeyen hata'));
+  }
 }
 
 // Sayfa yüklenince trash yükle
