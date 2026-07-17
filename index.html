@@ -1589,7 +1589,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-51</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-52</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -3578,6 +3578,13 @@ setInterval(updateLoginClock, 30000);
       <button class="btn btn-ghost btn-sm" onclick="exportCariExcel()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Excel
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="_cariReloadFromServer()" title="Bu cihazın kendi hafızasını atıp sunucudaki güncel veriyi yeniden çeker">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Sunucudan Yenile
+      </button>
+      <button class="btn btn-sm" style="background:rgba(251,146,60,.08);border-color:rgba(251,146,60,.3);color:#fb923c;" onclick="_cariFindDuplicates()" title="Aynı isimde birden fazla kayıt var mı tara">
+        🔍 Kopya Tara
       </button>
     </div>
   </div>
@@ -16890,6 +16897,83 @@ window.importCariFromExcel = function(event){
   _ensureXLSX(()=>_origImportCari(event));
 };
 
+
+// Bu cihazın kendi (muhtemelen eski/hatalı) hafızasını atıp sunucudaki güncel
+// veriyi olduğu gibi baz alır. Cihazlar arası veri sapmasını (örn. biri sildiği
+// halde diğerinde hâlâ görünen kayıtlar) düzeltmenin en güvenli yoludur.
+async function _cariReloadFromServer(){
+  if(!confirm('Bu cihazdaki Cari verisi, sunucudaki güncel haliyle DEĞİŞTİRİLECEK. Bu cihaza özel, henüz senkronize olmamış bir değişiklik varsa kaybolabilir. Devam edilsin mi?')) return;
+  if(!window._fbDb || !window._fbRef || !window._fbGet){ showToast('❌ İnternet bağlantısı gerekli','error'); return; }
+  try{
+    const snap = await window._fbGet(window._fbRef(window._fbDb,'konseltur/GLOBAL/cari'));
+    const val = snap && snap.exists() ? snap.val() : {};
+    _cariData = val || {};
+    try{ localStorage.setItem(_cariLsKey(), JSON.stringify(_cariData)); }catch(e){}
+    renderCariListe();
+    showToast('✅ Sunucudaki güncel veri yüklendi ('+Object.keys(_cariData).length+' cari)','success');
+  }catch(e){
+    console.error('Sunucudan yenileme hatası:', e);
+    showToast('❌ Yenileme başarısız: '+(e.message||'bilinmeyen hata'),'error');
+  }
+}
+
+// Aynı isimde birden fazla cari kaydını (farklı ID'lerle oluşmuş kopyaları) bulur
+// ve karşılaştırmalı olarak gösterir — hangisinin silineceğine kullanıcı karar verir
+function _cariFindDuplicates(){
+  const groups = {};
+  Object.values(_cariData||{}).forEach(c=>{
+    if(c.arsiv) return; // arşivlenmiş olanları ayrıca gösterme
+    const key = (c.isim||'').trim().toUpperCase();
+    if(!key) return;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(c);
+  });
+  const dupeGroups = Object.entries(groups).filter(([k,v])=>v.length>1);
+
+  const modal = document.createElement('div');
+  modal.id = 'cari-dupe-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+  modal.onclick = function(e){ if(e.target===modal) modal.remove(); };
+
+  let bodyHtml;
+  if(!dupeGroups.length){
+    bodyHtml = '<div style="text-align:center;padding:40px 20px;color:rgba(255,255,255,.4);font-size:13px;">🎉 Aynı isimde tekrar eden cari bulunamadı.</div>';
+  } else {
+    bodyHtml = dupeGroups.map(([name, list])=>{
+      const rows = list.map(c=>{
+        const hCount = Object.keys(c.hareketler||{}).length;
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid '+(hCount===0?'rgba(239,68,68,.25)':'rgba(255,255,255,.08)')+';border-radius:10px;margin-bottom:6px;">'
+          +'<div><div style="font-size:12px;color:rgba(255,255,255,.5);">'+escHtml(c.tur||'')+' · <b style="color:'+(hCount===0?'#f87171':'#4ade80')+';">'+hCount+' hareket</b></div>'
+          +(hCount===0?'<div style="font-size:10px;color:#f87171;margin-top:2px;">⚠️ Boş görünüyor — muhtemelen yanlışlıkla oluşmuş kopya</div>':'')+'</div>'
+          +'<div style="display:flex;gap:6px;">'
+          +'<button onclick="openCariDetay(\''+c.id+'\');document.getElementById(\'cari-dupe-modal\').remove();" style="padding:6px 10px;border-radius:7px;border:1px solid rgba(96,165,250,.3);background:rgba(96,165,250,.08);color:#60a5fa;font-size:11px;cursor:pointer;">Görüntüle</button>'
+          +'<button onclick="if(confirm(\'Bu kaydı silmek istediğinize emin misiniz?\")){deleteCariQuiet(\''+c.id+'\');document.getElementById(\'cari-dupe-modal\').remove();_cariFindDuplicates();}" style="padding:6px 10px;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#f87171;font-size:11px;cursor:pointer;">Sil</button>'
+          +'</div></div>';
+      }).join('');
+      return '<div style="margin-bottom:18px;"><div style="font-family:Syne,sans-serif;font-size:13px;font-weight:800;color:#fff;margin-bottom:8px;">👤 '+escHtml(name)+' <span style="color:rgba(255,255,255,.3);font-weight:400;">('+list.length+' kayıt)</span></div>'+rows+'</div>';
+    }).join('');
+  }
+
+  modal.innerHTML = '<div style="background:#0e1420;border:1px solid rgba(255,255,255,.1);border-radius:18px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;padding:22px;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'
+    +'<div style="font-family:Syne,sans-serif;font-size:16px;font-weight:800;color:#fff;">🔍 Kopya Cari Taraması</div>'
+    +'<button onclick="document.getElementById(\'cari-dupe-modal\').remove()" style="width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;">×</button>'
+    +'</div>'
+    +(dupeGroups.length?'<div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:16px;">'+dupeGroups.length+' isimde tekrar bulundu. "0 hareket" olan kayıtlar genelde yanlışlıkla oluşmuş boş kopyalardır.</div>':'')
+    +bodyHtml
+    +'</div>';
+  document.body.appendChild(modal);
+}
+
+// deleteCari'nin onay penceresi olmadan, sessizce (kopya temizliği için) çalışan hali —
+// yine de Son Silinenler'e taşır, kalıcı silme değildir
+async function deleteCariQuiet(id){
+  if(!_cariData[id]) return;
+  _trashAdd('cari', id, _cariData[id]);
+  delete _cariData[id];
+  await _saveCariToStorage();
+  showToast('🗑️ Kopya silindi (Son Silinenler\'den geri alınabilir)','success');
+}
 
 function exportCariExcel(){
   const entries=Object.entries(_cariData);
