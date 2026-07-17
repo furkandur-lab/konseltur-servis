@@ -1632,7 +1632,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-57</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.17-58</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -15417,29 +15417,28 @@ function _trashLoad() {
     const raw = localStorage.getItem('konseltur_trash_v1');
     window._trash = raw ? JSON.parse(raw) : [];
   } catch(e) { window._trash = []; }
-  // Firebase'den yükle — daha fazla veri orada olabilir
   const reqTime = Date.now();
   const _doTrashLoad = () => {
     if(!window._fbDb) return;
     window._fbOnValue(window._fbRef(window._fbDb,'konseltur/GLOBAL/trash'), snap => {
       // Yarış durumu koruması: bu dinleyici kurulduktan SONRA yerel bir silme/ekleme
       // yapıldıysa, gelen anlık görüntü muhtemelen eski/gecikmelidir — üzerine yazma
-      // (silinen bir öğenin geri gelmesi hatasının kök nedeni buydu)
       if(Date.now() - _lastTrashSaveAt < 4000) return;
-      if(snap && snap.exists()){
-        const fb = snap.val();
-        if(Array.isArray(fb) && fb.length > (window._trash||[]).length){
-          window._trash = fb;
-          try{ localStorage.setItem('konseltur_trash_v1', JSON.stringify(fb)); }catch(e){}
-          _trashUpdateBadge();
-          // Modal açıksa yenile
-          const modal = document.getElementById('trash-modal');
-          if(modal && modal.style.display !== 'none') _trashRender();
-        }
-      } else if((window._trash||[]).length > 0){
-        // Firebase boş, local'i yaz
-        window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/trash'), window._trash).catch(()=>{});
-      }
+      // ÖNEMLİ DÜZELTME: Eskiden burada iki kural vardı — (1) "gelen veri benimkinden
+      // UZUNSA kabul et" (kısalan güncellemeleri, yani gerçek "tümünü sil" işlemlerini
+      // reddediyordu) ve (2) "Firebase boşsa ama bende veri varsa, benimkini geri yaz"
+      // (bu da, boşta açık kalmış bir cihazın, başka bir cihazdaki KASITLI silme
+      // işlemini otomatik olarak GERİ ALMASINA sebep oluyordu — bildirilen "sadece
+      // PC'den silince geri geliyor" hatasının kök nedeni tam olarak buydu). İkisi de
+      // kaldırıldı — artık diğer modüllerdeki gibi sunucudaki son hal doğrudan esas
+      // alınıyor.
+      const fb = (snap && snap.exists()) ? snap.val() : [];
+      const fbArr = Array.isArray(fb) ? fb : (fb && typeof fb==='object' ? Object.values(fb) : []);
+      window._trash = fbArr;
+      try{ localStorage.setItem('konseltur_trash_v1', JSON.stringify(fbArr)); }catch(e){}
+      _trashUpdateBadge();
+      const modal = document.getElementById('trash-modal');
+      if(modal && modal.style.display !== 'none') _trashRender();
     });
   };
   if(window._fbReady) _doTrashLoad();
