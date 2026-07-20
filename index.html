@@ -1559,6 +1559,19 @@ body.light .pay-row:hover { background:rgba(0,0,0,.025); }
  // Sayfa yüklenince Firebase hazır sinyali ver
  window.dispatchEvent(new Event('firebase-ready'));
 
+// GENEL GÜVENLİK AĞI: Yakalanmamış (unhandled) bir Promise hatası olursa (örn. bir
+// kayıt fonksiyonu sunucuya yazamadığında ve bunu özel olarak ele alan bir try/catch
+// yoksa), artık sessizce kaybolmuyor — kullanıcıya görünür bir hata bildirimi çıkıyor.
+// Çöp Kutusu ve Cari hareket düzenlemede bulduğumuz "sessizce başarısız olma" hatasının
+// aynısının, henüz tek tek incelemediğimiz diğer kayıt noktalarında da yaşanmasını önler.
+window.addEventListener('unhandledrejection', function(event){
+  console.error('Yakalanmamış hata (kayıt sunucuya ulaşmamış olabilir):', event.reason);
+  if(typeof toast === 'function'){
+    const msg = (event.reason && event.reason.message) ? event.reason.message : 'bilinmeyen hata';
+    toast('⚠️ Bir işlem sunucuya kaydedilemedi: '+msg+' — internet bağlantınızı kontrol edip tekrar deneyin','error');
+  }
+});
+
 // Klavye kısayolları
 document.addEventListener('keydown', function(e){
  // ESC → modalları kapat
@@ -1632,7 +1645,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-61</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-62</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -14613,15 +14626,18 @@ async function _saveCariToStorage(){
   // Güvenlik kilidi: Firebase'in gerçek son halini görmeden ASLA üzerine yazma
   await _waitCariSync();
   try{ localStorage.setItem(_cariLsKey(), JSON.stringify(_cariData)); }catch(e){}
-  try{
-    if(window._fbDb && window._fbRef && window._fbSet){
-      // Cari verisi okul bağımsız - sabit 'GLOBAL' yolu kullan
-      const dbRef = window._fbRef(window._fbDb, 'konseltur/GLOBAL/cari');
-      // Firebase'e yazmanın TAMAMLANMASINI bekle — erken sayfa yenilemesinde
-      // eski Firebase verisinin yeni kaydı ezmesini önler
-      await window._fbSet(dbRef, _cariData);
-    }
-  }catch(e){ console.warn('Cari FB kayıt hatası:', e); }
+  // ÖNEMLİ: Hata artık YUTULMUYOR — Çöp Kutusu'nda bulduğumuz aynı "sessiz başarısızlık"
+  // kalıbı burada da vardı. Ekranda değişiklik "kaydedilmiş gibi" görünüyordu ama
+  // sunucuya hiç ulaşmamış olabiliyordu; sayfa yenilenince eski veri geri geliyordu.
+  // Çağıran fonksiyon artık bu hatayı yakalayıp kullanıcıya gerçekten gösterebiliyor.
+  if(!window._fbDb || !window._fbRef || !window._fbSet){
+    throw new Error('Firebase hazır değil (internet bağlantısı veya oturum sorunu olabilir)');
+  }
+  // Cari verisi okul bağımsız - sabit 'GLOBAL' yolu kullan
+  const dbRef = window._fbRef(window._fbDb, 'konseltur/GLOBAL/cari');
+  // Firebase'e yazmanın TAMAMLANMASINI bekle — erken sayfa yenilemesinde
+  // eski Firebase verisinin yeni kaydı ezmesini önler
+  await window._fbSet(dbRef, _cariData);
 }
 
 function _newCariId(){ return 'c_' + Date.now() + '_' + Math.random().toString(36).substr(2,5); }
@@ -15405,10 +15421,15 @@ async function saveCariHareket(){
     _cariData[id].hareketler[hid]._karsiCariId = karsiId;
     _cariData[id].hareketler[hid]._karsiHareketId = karsiHid;
   }
-  await _saveCariToStorage();
-  document.getElementById('cari-hareket-modal').classList.remove('open');
-  showToast((tip==='borc'?'Alınan':'Verilen')+' kaydedildi: '+_fmtPara(tutar),'success');
-  renderCariDetay(id);
+  try{
+    await _saveCariToStorage();
+    document.getElementById('cari-hareket-modal').classList.remove('open');
+    showToast('✅ '+(tip==='borc'?'Alınan':'Verilen')+' kaydedildi: '+_fmtPara(tutar),'success');
+    renderCariDetay(id);
+  }catch(e){
+    console.error('Hareket kaydedilemedi:', e);
+    showToast('❌ SUNUCUYA KAYDEDİLEMEDİ: '+(e.message||'bilinmeyen hata')+' — internet bağlantınızı kontrol edip tekrar deneyin','error');
+  }
 }
 function deleteCariHareket(cariId,hareketId){
   if(!_cariData[cariId]||!_cariData[cariId].hareketler||!_cariData[cariId].hareketler[hareketId]) return;
@@ -15421,10 +15442,16 @@ function deleteCariHareket(cariId,hareketId){
     const _hObj = _cariData[cariId]?.hareketler?.[hareketId];
     if(_hObj) _trashAdd('hareket', hareketId, {..._hObj, _cariId: cariId});
     delete _cariData[cariId].hareketler[hareketId];
-    await _saveCariToStorage();
-    cm.style.display='none';
-    showToast('Hareket silindi','success');
-    renderCariDetay(cariId);
+    try{
+      await _saveCariToStorage();
+      cm.style.display='none';
+      showToast('✅ Hareket silindi ve sunucuya kaydedildi','success');
+      renderCariDetay(cariId);
+    }catch(e){
+      console.error('Hareket silme kaydedilemedi:', e);
+      cm.style.display='none';
+      showToast('❌ SUNUCUYA KAYDEDİLEMEDİ: '+(e.message||'bilinmeyen hata')+' — internet bağlantınızı kontrol edip tekrar deneyin','error');
+    }
   };
   cm.style.display='flex';
 }
@@ -16282,11 +16309,16 @@ async function _echKaydet(){
     console.warn('Karşı hesap eşleştirme adımı atlandı (asıl kayıt yine de kaydedilecek):', e);
   }
 
-  await _saveCariToStorage();
-  _echKapat();
-  renderCariDetay(cariId);
-  showToast('Hareket güncellendi','success');
-  window._echState = null;
+  try{
+    await _saveCariToStorage();
+    _echKapat();
+    renderCariDetay(cariId);
+    showToast('✅ Hareket güncellendi ve sunucuya kaydedildi','success');
+    window._echState = null;
+  }catch(e){
+    console.error('Hareket düzenleme kaydedilemedi:', e);
+    showToast('❌ SUNUCUYA KAYDEDİLEMEDİ: '+(e.message||'bilinmeyen hata')+' — internet bağlantınızı kontrol edip tekrar deneyin','error');
+  }
 }
 
 function _echKapat(){
