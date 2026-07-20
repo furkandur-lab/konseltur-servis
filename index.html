@@ -1632,7 +1632,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-59</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-60</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -14669,6 +14669,24 @@ function _parseMoneyInput(val){
   return digits ? parseInt(digits,10) : 0;
 }
 
+// Hareketleri sıralamak için TEK, tutarlı bir sayısal anahtar üretir.
+// ÖNEMLİ: Önceki yöntem, "ikisi de tarihliyse tarihe göre, değilse ts'ye göre" diye
+// iki farklı kıyaslama kuralını AYNI sort() içinde karıştırıyordu — bu, matematiksel
+// olarak tutarsız (transitif olmayan) bir sıralama üretebiliyordu (A<B, B<C ama C<A
+// gibi), ve bu da özellikle karışık (bazı tarihli bazı tarihsiz) kayıtlarda yeni
+// eklenen bir işlemin beklenmedik bir yere (örn. en alta) düşmesine yol açabiliyordu.
+// Artık TEK bir sayısal zaman çizelgesi kullanılıyor: gerçek tarih varsa onun milisaniye
+// karşılığı, yoksa kaydın eklenme sırası (ts). İkisi de aynı büyüklükteki sayılar
+// olduğu için (yeni eklenen bir kaydın ts'si de "şimdi" = gerçek bir tarihle aynı
+// mertebede), doğal ve tutarlı bir sıralama ortaya çıkıyor.
+function _hareketSortKey(h){
+  if(h.tarih){
+    const t = new Date(h.tarih).getTime();
+    if(!isNaN(t)) return t;
+  }
+  return h.ts||0;
+}
+
 function renderCariListe(){
   const wrap = document.getElementById('cari-list-wrap');
   const countEl = document.getElementById('cari-list-count');
@@ -15065,15 +15083,7 @@ function renderCariDetay(id){
   }
 
   let runBal = 0;
-  const sorted = [...hareketler].sort((a,b)=>{
-    const ta = a.tarih||'', tb = b.tarih||'';
-    // İkisi de tarihliyse ve tarihler farklıysa takvime göre sırala.
-    // Aksi halde (biri veya ikisi tarihsizse, ya da tarihler eşitse) eklenme/satır
-    // sırasına (ts) göre sırala — böylece tarihsiz Excel satırları listenin başına
-    // sıçramaz, orijinal sırasındaki komşularının arasında kalır.
-    if(ta && tb && ta !== tb) return ta.localeCompare(tb);
-    return (a.ts||0) - (b.ts||0);
-  });
+  const sorted = [...hareketler].sort((a,b)=> _hareketSortKey(a) - _hareketSortKey(b));
   sorted.forEach(h=>{ runBal += (parseFloat(h.borc||0) - parseFloat(h.alacak||0)); h._rb = runBal; });
   sorted.reverse();
 
@@ -15132,11 +15142,7 @@ function _renderSadecaHareketList(id){
   }
 
   let runBal = 0;
-  const sorted = [...hareketler].sort((a,b)=>{
-    const ta=a.tarih||'', tb=b.tarih||'';
-    if(ta && tb && ta !== tb) return ta.localeCompare(tb);
-    return (a.ts||0)-(b.ts||0);
-  });
+  const sorted = [...hareketler].sort((a,b)=> _hareketSortKey(a) - _hareketSortKey(b));
   sorted.forEach(h=>{ runBal+=(parseFloat(h.borc||0)-parseFloat(h.alacak||0)); h._rb=runBal; });
   sorted.reverse();
 
@@ -16278,13 +16284,7 @@ function exportCariDetayPDF(){
   // Hareketler tablosu
   const hareketler = Object.entries(c.hareketler||{})
     .map(([hid,h])=>({id:hid,...h}))
-    .sort((a,b)=>{
-      const ta=a.tarih||'', tb=b.tarih||'';
-      // İkisi de tarihliyse takvime göre; aksi halde satır/eklenme sırasına (ts) göre —
-      // böylece tarihsiz Excel satırları PDF'in başına sıçramaz (bkz. cari hareket listesi düzeltmesi)
-      if(ta && tb && ta !== tb) return ta.localeCompare(tb);
-      return (a.ts||0) - (b.ts||0);
-    });
+    .sort((a,b)=> _hareketSortKey(a) - _hareketSortKey(b));
 
   let runBal = 0;
   const rows = hareketler.map(h=>{
@@ -17153,11 +17153,7 @@ function exportCariExcel(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(genelRows), 'GENEL LİSTE');
   entries.forEach(([id,c],i)=>{
-    const har=Object.values(c.hareketler||{}); har.sort((a,b)=>{
-      const ta=a.tarih||'', tb=b.tarih||'';
-      if(ta && tb && ta !== tb) return ta.localeCompare(tb);
-      return (a.ts||0)-(b.ts||0);
-    });
+    const har=Object.values(c.hareketler||{}); har.sort((a,b)=> _hareketSortKey(a) - _hareketSortKey(b));
     const rows=[['CARİ: '+(c.isim||'')],['SR.NO','TARİH','AÇIKLAMA','ALINAN','VERİLEN','BAKİYE']];
     let bal=0; har.forEach((h,j)=>{ const b=parseFloat(h.borc||0),a=parseFloat(h.alacak||0); bal+=(b-a); rows.push([j+1,h.tarih||'',h.aciklama||'',b,a,bal]); });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), String(i+1).substring(0,30));
