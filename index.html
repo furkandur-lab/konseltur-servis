@@ -1645,7 +1645,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-64</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-65</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -16563,6 +16563,15 @@ async function importCariFromExcel(event){
           // SR.NO boş olsa da kabul et — sadece TOPLAM satırlarını atla
           var srNo=(hr[0]!==null&&hr[0]!==undefined)?hr[0].toString().trim():'';
           if(srNo.toUpperCase().indexOf('TOPLAM')>=0||srNo.toUpperCase().indexOf('TOTAL')>=0) continue;
+          // ÖNEMLİ: Bazı sayfaların en altında, SR.NO / TARİH / AÇIKLAMA'sı TAMAMEN
+          // BOŞ olan ama BORÇ/ALACAK sütunlarında (formülle hesaplanmış) devasa bir
+          // GENEL TOPLAM duran gizli bir satır bulunuyor — "TOPLAM" yazmadığı için
+          // yukarıdaki kontrol bunu yakalayamıyordu. Bu satır gerçek bir işlem değil;
+          // içe aktarılırsa o carinin toplamını neredeyse ikiye katlayan hayalet bir
+          // kayıt oluşturuyordu (Kasa Cari'de tam olarak bu tespit edildi). Gerçek bir
+          // işlemde en azından bir açıklama bulunur — üçü birden boşsa bu satır atlanır.
+          var tarihVarMi1 = tarihCol>=0 && hr[tarihCol]!==null && hr[tarihCol]!==undefined && hr[tarihCol]!=='';
+          if(!srNo && !tarihVarMi1 && !acStr){ continue; }
           var borcV = bV;
           var alacakV = aV;
           var aciklama = acStr;
@@ -17051,6 +17060,12 @@ async function importKasaFromExcel(event){
           // SR.NO boş olsa da kabul et — sadece TOPLAM satırlarını atla
           var srNo=(hr[0]!==null&&hr[0]!==undefined)?hr[0].toString().trim():'';
           if(srNo.toUpperCase().indexOf('TOPLAM')>=0||srNo.toUpperCase().indexOf('TOTAL')>=0) continue;
+          // ÖNEMLİ: bkz. importCariFromExcel'deki aynı düzeltme — SR.NO/TARİH/AÇIKLAMA'sı
+          // tamamen boş olan ama BORÇ/ALACAK'ta formülle hesaplanmış devasa bir GENEL
+          // TOPLAM duran satırlar, gerçek işlem gibi içe aktarılıp toplamı ikiye
+          // katlıyordu (Kasa Cari'de tespit edildi).
+          var tarihVarMi2 = tarihCol>=0 && hr[tarihCol]!==null && hr[tarihCol]!==undefined && hr[tarihCol]!=='';
+          if(!srNo && !tarihVarMi2 && !acStr){ continue; }
           var borcV = bV;
           var alacakV = aV;
           var aciklama = acStr;
