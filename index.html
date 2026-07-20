@@ -1632,7 +1632,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-60</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-61</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -14549,16 +14549,30 @@ function loadCariData(){
           // eklenmiş bir hareket, ya da aynı anda başka bir yazma bekleniyorsa) kaybolmaz.
           // NOT: Sadece üst seviye (cari kaydı) değil, her cari'nin İÇİNDEKİ hareketler
           // alt-nesnesi de işlem ID'sine göre ayrıca birleştiriliyor — aksi halde çevrimdışı
-          // eklenen bir hareket, o cari'nin sunucudaki eski haliyle sessizce ezilebilirdi
-          // (örn. internet olmadan bir hareket girip sekmeyi kapatıp daha sonra tekrar
-          // açtığınızda o hareketin kaybolması riski buydu).
+          // eklenen bir hareket, o cari'nin sunucudaki eski haliyle sessizce ezilebilirdi.
+          // AYRICA: bir hareketi DÜZENLEDİĞİNİZDE (id değişmez, sadece içeriği değişir),
+          // eski birleştirme her zaman sunucu tarafını tercih ediyordu — bu da "tarihi
+          // değiştirdim ama geri geldi" hatasının kök nedeniydi. Artık aynı ID'ye sahip
+          // bir hareket her iki tarafta da varsa, hangisi daha YENİ düzenlendiyse (ts
+          // damgasına göre) o kazanıyor — düzenleme fonksiyonu her kayıtta ts'yi zaten
+          // güncel tutuyor, bu yüzden bu karşılaştırma güvenilir.
           const merged = {};
           const allIds = new Set([].concat(Object.keys(_cariData||{}), Object.keys(val||{})));
           allIds.forEach(function(id){
             const l = (_cariData||{})[id], r = (val||{})[id];
             if(l && r){
               merged[id] = Object.assign({}, l, r);
-              merged[id].hareketler = Object.assign({}, l.hareketler||{}, r.hareketler||{});
+              const mergedHareketler = {};
+              const allHids = new Set([].concat(Object.keys(l.hareketler||{}), Object.keys(r.hareketler||{})));
+              allHids.forEach(function(hid){
+                const lh = (l.hareketler||{})[hid], rh = (r.hareketler||{})[hid];
+                if(lh && rh){
+                  mergedHareketler[hid] = (Number(lh.ts)||0) >= (Number(rh.ts)||0) ? lh : rh;
+                } else {
+                  mergedHareketler[hid] = lh || rh;
+                }
+              });
+              merged[id].hareketler = mergedHareketler;
             } else {
               merged[id] = l || r;
             }
@@ -16205,59 +16219,67 @@ async function _echKaydet(){
     _karsiHareketId: _eskiH._karsiHareketId
   };
 
-  // Karşı carideki bağlantılı hareketi de güncelle
-  const _mevcutH = _cariData[cariId].hareketler[hareketId];
-  const aktivIsim = (_cariData[cariId] && _cariData[cariId].isim) || '';
-  const yeniTarih = tarih || new Date().toISOString().split('T')[0];
-  const aciklamaBaz = aciklama || (tip==='borc'?'Alındı':'Verildi');
-  let _karsiGuncellendi = false;
+  // Karşı carideki bağlantılı hareketi de güncelle — bu adım İSTEĞE BAĞLI bir
+  // iyileştirmedir (varsa karşı taraftaki kaydı da senkronlar). Burada bir hata
+  // oluşursa bile ASIL düzenlemenin (yukarıda zaten uygulandı) kaydedilmesini
+  // engellememesi için try/catch ile sarmalanıyor — önceden bir hata burada asıl
+  // kaydın hiç kaydedilmemesine yol açabiliyordu ("düzenleme kaydetmiyor" hatası).
+  try{
+    const _mevcutH = _cariData[cariId].hareketler[hareketId];
+    const aktivIsim = (_cariData[cariId] && _cariData[cariId].isim) || '';
+    const yeniTarih = tarih || new Date().toISOString().split('T')[0];
+    const aciklamaBaz = aciklama || (tip==='borc'?'Alındı':'Verildi');
+    let _karsiGuncellendi = false;
 
-  // 1. Referans varsa direkt güncelle
-  const _refCariId = _eskiH._karsiCariId;
-  const _refHid    = _eskiH._karsiHareketId;
-  if(_refCariId && _refHid && _cariData[_refCariId] && _cariData[_refCariId].hareketler && _cariData[_refCariId].hareketler[_refHid]){
-    const kh = _cariData[_refCariId].hareketler[_refHid];
-    _cariData[_refCariId].hareketler[_refHid] = Object.assign({}, kh, {
-      tarih: yeniTarih,
-      aciklama: aciklamaBaz + ' — ' + aktivIsim,
-      borc:   tip==='borc' ? tutar : 0,
-      alacak: tip==='alacak' ? tutar : 0,
-      ts: Date.now() + 1
-    });
-    _karsiGuncellendi = true;
-  }
-
-  // 2. Referans yoksa — tüm carilerde eşleşen hareketi bul
-  if(!_karsiGuncellendi){
-    Object.keys(_cariData).forEach(function(key){
-      if(key === cariId || _karsiGuncellendi) return;
-      const karsiC = _cariData[key];
-      if(!karsiC || !karsiC.hareketler) return;
-      Object.keys(karsiC.hareketler).forEach(function(khid){
-        if(_karsiGuncellendi) return;
-        const kh = karsiC.hareketler[khid];
-        if(!kh) return;
-        // _karsiHareketId referansı var mı?
-        const refEslesti = kh._karsiHareketId === hareketId || kh._karsiCariId === cariId;
-        // Ya da tarih + tutar eşleşiyor mu?
-        const khTutar = (kh.borc||0) > 0 ? (kh.borc||0) : (kh.alacak||0);
-        const tarihEslesti = kh.tarih === _eskiTarih;
-        const tutarEslesti = Math.abs(khTutar - _eskiTutar) < 0.01;
-        // Açıklamada aktif carinin adı geçiyor mu?
-        const aciklamaEslesti = (kh.aciklama||'').toLowerCase().indexOf(aktivIsim.toLowerCase()) >= 0;
-
-        if(refEslesti || (tarihEslesti && tutarEslesti && aciklamaEslesti)){
-          _cariData[key].hareketler[khid] = Object.assign({}, kh, {
-            tarih: yeniTarih,
-            aciklama: aciklamaBaz + ' — ' + aktivIsim,
-            borc:   tip==='borc' ? tutar : 0,
-            alacak: tip==='alacak' ? tutar : 0,
-            ts: Date.now() + 1
-          });
-          _karsiGuncellendi = true;
-        }
+    // 1. Referans varsa direkt güncelle
+    const _refCariId = _eskiH._karsiCariId;
+    const _refHid    = _eskiH._karsiHareketId;
+    if(_refCariId && _refHid && _cariData[_refCariId] && _cariData[_refCariId].hareketler && _cariData[_refCariId].hareketler[_refHid]){
+      const kh = _cariData[_refCariId].hareketler[_refHid];
+      _cariData[_refCariId].hareketler[_refHid] = Object.assign({}, kh, {
+        tarih: yeniTarih,
+        aciklama: aciklamaBaz + ' — ' + aktivIsim,
+        borc:   tip==='borc' ? tutar : 0,
+        alacak: tip==='alacak' ? tutar : 0,
+        ts: Date.now() + 1
       });
-    });
+      _karsiGuncellendi = true;
+    }
+
+    // 2. Referans yoksa — tüm carilerde eşleşen hareketi bul
+    if(!_karsiGuncellendi){
+      Object.keys(_cariData).forEach(function(key){
+        if(key === cariId || _karsiGuncellendi) return;
+        const karsiC = _cariData[key];
+        if(!karsiC || !karsiC.hareketler) return;
+        Object.keys(karsiC.hareketler).forEach(function(khid){
+          if(_karsiGuncellendi) return;
+          const kh = karsiC.hareketler[khid];
+          if(!kh) return;
+          // _karsiHareketId referansı var mı?
+          const refEslesti = kh._karsiHareketId === hareketId || kh._karsiCariId === cariId;
+          // Ya da tarih + tutar eşleşiyor mu?
+          const khTutar = (kh.borc||0) > 0 ? (kh.borc||0) : (kh.alacak||0);
+          const tarihEslesti = kh.tarih === _eskiTarih;
+          const tutarEslesti = Math.abs(khTutar - _eskiTutar) < 0.01;
+          // Açıklamada aktif carinin adı geçiyor mu?
+          const aciklamaEslesti = (kh.aciklama||'').toLowerCase().indexOf(aktivIsim.toLowerCase()) >= 0;
+
+          if(refEslesti || (tarihEslesti && tutarEslesti && aciklamaEslesti)){
+            _cariData[key].hareketler[khid] = Object.assign({}, kh, {
+              tarih: yeniTarih,
+              aciklama: aciklamaBaz + ' — ' + aktivIsim,
+              borc:   tip==='borc' ? tutar : 0,
+              alacak: tip==='alacak' ? tutar : 0,
+              ts: Date.now() + 1
+            });
+            _karsiGuncellendi = true;
+          }
+        });
+      });
+    }
+  }catch(e){
+    console.warn('Karşı hesap eşleştirme adımı atlandı (asıl kayıt yine de kaydedilecek):', e);
   }
 
   await _saveCariToStorage();
