@@ -1645,7 +1645,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-63</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-64</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -3820,7 +3820,7 @@ setInterval(updateLoginClock, 30000);
   <!-- Hareket Arama -->
   <div id="cdet-search-wrap" style="position:relative;margin-bottom:12px;z-index:20;">
     <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none;z-index:21;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input id="cdet-hareket-search" type="text" placeholder="Açıklama veya tarih ara..."
+    <input id="cdet-hareket-search" type="text" placeholder="Açıklama, tarih veya tutar ara..."
       oninput="filterCariHareketler(this.value)"
       style="width:100%;padding:9px 36px 9px 34px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;font-size:13px;font-family:Outfit,sans-serif;outline:none;box-sizing:border-box;position:relative;z-index:22;-webkit-user-select:text;user-select:text;">
     <button id="cdet-hareket-search-clear" onclick="clearHareketSearch()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:16px;line-height:1;padding:0;z-index:23;">×</button>
@@ -15117,12 +15117,14 @@ function renderCariDetay(id){
   sorted.forEach(h=>{ runBal += (parseFloat(h.borc||0) - parseFloat(h.alacak||0)); h._rb = runBal; });
   sorted.reverse();
 
-  // Filtre uygula
+  // Filtre uygula (açıklama, tarih VEYA tutar)
   const _hFilter = (window._cdetHareketFilter||'').toLowerCase();
+  const _hFilterDigits = _hFilter.replace(/[^0-9]/g,'');
   const displayed = _hFilter
     ? sorted.filter(h=>
         (h.aciklama||'').toLowerCase().includes(_hFilter) ||
-        (h.tarih||'').includes(_hFilter)
+        (h.tarih||'').includes(_hFilter) ||
+        (_hFilterDigits && (String(h.borc||'').includes(_hFilterDigits) || String(h.alacak||'').includes(_hFilterDigits)))
       )
     : sorted;
 
@@ -15177,8 +15179,9 @@ function _renderSadecaHareketList(id){
   sorted.reverse();
 
   const _hFilter=(window._cdetHareketFilter||'').toLowerCase();
+  const _hFilterDigits2 = _hFilter.replace(/[^0-9]/g,'');
   const displayed=_hFilter
-    ? sorted.filter(h=>(h.aciklama||'').toLowerCase().includes(_hFilter)||(h.tarih||'').includes(_hFilter))
+    ? sorted.filter(h=>(h.aciklama||'').toLowerCase().includes(_hFilter)||(h.tarih||'').includes(_hFilter)||(_hFilterDigits2 && (String(h.borc||'').includes(_hFilterDigits2)||String(h.alacak||'').includes(_hFilterDigits2))))
     : sorted;
 
   if(hCount) hCount.textContent=_hFilter
