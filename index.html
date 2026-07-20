@@ -1645,7 +1645,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-62</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-63</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -16242,8 +16242,13 @@ async function _echKaydet(){
     borc:     tip==='borc' ? tutar : 0,
     alacak:   tip==='alacak' ? tutar : 0,
     ts:       Date.now(),
-    _karsiCariId:    _eskiH._karsiCariId,
-    _karsiHareketId: _eskiH._karsiHareketId
+    // Firebase "undefined" değer içeren hiçbir kaydı KABUL ETMİYOR — Excel'den
+    // içe aktarılmış (karşı hesabı hiç olmayan) bir hareketi düzenlerken bu alanlar
+    // _eskiH'de hiç yoktu, yani "undefined" oluyordu ve TÜM Cari kaydı bu yüzden
+    // reddediliyordu (bu hareket sadece bir örnekti, aslında SİZİN yaptığınız HER
+    // kayıt bu yüzden başarısız oluyordu). "|| null" ile bu artık güvenli.
+    _karsiCariId:    _eskiH._karsiCariId    || null,
+    _karsiHareketId: _eskiH._karsiHareketId || null
   };
 
   // Karşı carideki bağlantılı hareketi de güncelle — bu adım İSTEĞE BAĞLI bir
