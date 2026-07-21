@@ -1586,6 +1586,22 @@ window.addEventListener('unhandledrejection', function(event){
   }
 });
 
+// 5 buton (Takvim/Hesap Makinesi/KDV/Uyumsoft/Arvento) GERÇEK ana sayfada (modül seçim
+// ekranı) görünsün. Bu ekran 9 farklı fonksiyon tarafından açılıp kapatılabildiği için,
+// her birini tek tek yakalamak yerine ekranın gerçek durumunu düzenli aralıklarla
+// kontrol edip butonları buna göre senkronlayan basit ve garantili bir yöntem kullanılıyor.
+setInterval(function(){
+  var ms = document.getElementById('module-select-screen');
+  var onHome = ms && ms.style.display === 'flex';
+  ['cal-toggle-btn','calc-toggle-btn','kdv-toggle-btn','uyumsoft-toggle-btn','arvento-toggle-btn'].forEach(function(id){
+    var btn = document.getElementById(id);
+    if(btn){
+      var want = onHome ? 'flex' : 'none';
+      if(btn.style.display !== want) btn.style.display = want;
+    }
+  });
+}, 400);
+
 // Klavye kısayolları
 document.addEventListener('keydown', function(e){
  // ESC → modalları kapat
@@ -1659,7 +1675,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-69</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-70</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -2671,6 +2687,10 @@ function _addManagedListener(target, event, handler, options) {
           <button id="update-btn" onclick="forceUpdate()" title="Hem uygulamayı hem tüm verileri sunucudan yeniler" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:rgba(255,255,255,.35);font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;" onmouseover="this.style.color='rgba(255,255,255,.7)'" onmouseout="this.style.color='rgba(255,255,255,.35)'">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             Güncelle
+          </button>
+          <button onclick="openGlobalSearch()" title="Öğrenci, şoför, rota ve cari hesaplarda birlikte ara" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);color:#60a5fa;font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;" onmouseover="this.style.background='rgba(96,165,250,.16)'" onmouseout="this.style.background='rgba(96,165,250,.07)'">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Hızlı Ara
           </button>
           <input type="file" id="login-import-input" accept=".json" style="display:none;" onchange="importDataFromLogin(event)">
         </div>
