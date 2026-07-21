@@ -1586,13 +1586,13 @@ window.addEventListener('unhandledrejection', function(event){
   }
 });
 
-// 5 buton (Takvim/Hesap Makinesi/KDV/Uyumsoft/Arvento) GERÇEK ana sayfada (modül seçim
-// ekranı) görünsün. Bu ekran 9 farklı fonksiyon tarafından açılıp kapatılabildiği için,
-// her birini tek tek yakalamak yerine ekranın gerçek durumunu düzenli aralıklarla
-// kontrol edip butonları buna göre senkronlayan basit ve garantili bir yöntem kullanılıyor.
+// 5 buton (Takvim/Hesap Makinesi/KDV/Uyumsoft/Arvento) GERÇEK ana sayfada (Ana Menü)
+// görünsün. ÖNEMLİ: Bu ekranın gerçek id'si "login-screen" — "module-select-screen"
+// adlı ayrı bir eleman de var ama o hiç kullanılmıyor (muhtemelen eski/atıl kod),
+// önceki sürümde yanlışlıkla onu kontrol ediyordum, bu yüzden butonlar hiç görünmüyordu.
 setInterval(function(){
-  var ms = document.getElementById('module-select-screen');
-  var onHome = ms && ms.style.display === 'flex';
+  var ls = document.getElementById('login-screen');
+  var onHome = ls && ls.style.display !== 'none';
   ['cal-toggle-btn','calc-toggle-btn','kdv-toggle-btn','uyumsoft-toggle-btn','arvento-toggle-btn'].forEach(function(id){
     var btn = document.getElementById(id);
     if(btn){
@@ -1675,7 +1675,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-70</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-71</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -17200,6 +17200,16 @@ window.importCariFromExcel = function(event){
 // ── HIZLI ARAMA (Genel Arama) ──
 // Öğrenciler, Şoförler, Rotalar ve (yüklüyse) Cari Hesaplar'da BİRLİKTE arar.
 function openGlobalSearch(){
+  // Cari verisi henüz hafızaya hiç yüklenmemişse (örn. ana sayfadan, hiç Cari
+  // Hesaplar'a girmeden arama yapılıyorsa), aramanın cari sonuçlarını da
+  // bulabilmesi için burada yükleniyor — "Furkan Dur" gibi bir ismi bulamama
+  // sorununun kaynağı buydu.
+  try{
+    if((typeof _cariData==='undefined' || !_cariData || !Object.keys(_cariData).length) && typeof loadCariData==='function'){
+      loadCariData();
+    }
+  }catch(e){ console.warn('Hızlı Arama: Cari verisi önceden yüklenemedi', e); }
+
   var old = document.getElementById('gsearch-screen');
   if(old) old.remove();
   var scr = document.createElement('div');
