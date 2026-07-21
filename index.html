@@ -75,6 +75,17 @@ html,body{height:100%;overflow:hidden;overflow-x:hidden;max-width:100vw;}
     yakınlaştırmayı baştan engelliyoruz.
  */
  input,textarea,select{font-size:16px!important;}
+ /* Sol alttaki yüzen butonlar (Takvim, Hesap Makinesi, KDV, Uyumsoft, Arvento) artık
+    5 taneye çıktığı için, dar ekranlarda sıkışmasınlar diye biraz küçültülüp aralık
+    daraltılıyor */
+ #cal-toggle-btn, #calc-toggle-btn, #kdv-toggle-btn, #uyumsoft-toggle-btn, #arvento-toggle-btn{
+   width:42px!important; height:42px!important; border-radius:12px!important;
+ }
+ #cal-toggle-btn{ left:14px!important; bottom:14px!important; }
+ #calc-toggle-btn{ left:14px!important; bottom:64px!important; }
+ #kdv-toggle-btn{ left:64px!important; bottom:14px!important; }
+ #uyumsoft-toggle-btn{ left:64px!important; bottom:64px!important; }
+ #arvento-toggle-btn{ left:114px!important; bottom:14px!important; }
 }
 body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);}
 ::selection{background:rgba(200,55,26,.45);color:#fff;}
@@ -1504,7 +1515,7 @@ body.light .pay-row:hover { background:rgba(0,0,0,.025); }
 /* MADDE 6: Print optimizasyonu */
 @media print {
   nav, .sidebar, .page:not(.active), #pdf-overlay,
-  #cal-toggle-btn, #kdv-toggle-btn, #calc-toggle-btn,
+  #cal-toggle-btn, #kdv-toggle-btn, #calc-toggle-btn, #uyumsoft-toggle-btn, #arvento-toggle-btn,
   #cal-widget, #kdv-widget, #calc-widget { display:none !important; }
   body, .page-inner { background:#fff !important; color:#111 !important; padding:0 !important; }
   .tbl { width:100%; border-collapse:collapse; font-size:11px; color:#111; }
@@ -1645,7 +1656,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-65</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-67</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -2831,6 +2842,20 @@ setInterval(updateLoginClock, 30000);
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
 </button>
 
+<!-- UYUMSOFT E-FATURA BUTONU -->
+<button onclick="window.open('https://www.uyumsoft.com/kullanici-girisi','_blank')" id="uyumsoft-toggle-btn" title="Uyumsoft e-Fatura paneline git"
+  style="position:fixed;left:78px;bottom:76px;z-index:499;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(139,92,246,.85),rgba(109,40,217,.85));border:1px solid rgba(139,92,246,.5);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;box-shadow:0 4px 20px rgba(139,92,246,.3),0 2px 8px rgba(0,0,0,.4);"
+  onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+</button>
+
+<!-- ARVENTO ARAÇ TAKİP BUTONU -->
+<button onclick="window.open('https://www.arvento.com','_blank')" id="arvento-toggle-btn" title="Arvento Araç Takip'e git"
+  style="position:fixed;left:136px;bottom:20px;z-index:499;width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(14,165,233,.85),rgba(2,132,199,.85));border:1px solid rgba(14,165,233,.5);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;box-shadow:0 4px 20px rgba(14,165,233,.3),0 2px 8px rgba(0,0,0,.4);"
+  onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M3 17h1a2 2 0 0 0 4 0h6a2 2 0 0 0 4 0h1a1 1 0 0 0 1-1v-3.28a1 1 0 0 0-.29-.71L17 9h-2V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1z"/><circle cx="7.5" cy="17" r="1.6"/><circle cx="17.5" cy="17" r="1.6"/><path d="M14 9V6"/></svg>
+</button>
+
 
 <!-- NOT DEFTERİ MODAL -->
 <div id="notepad-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;" onclick="if(event.target===this)closeNotepad()">
@@ -3643,6 +3668,9 @@ setInterval(updateLoginClock, 30000);
       </button>
       <button class="btn btn-sm" style="background:rgba(251,146,60,.08);border-color:rgba(251,146,60,.3);color:#fb923c;" onclick="_cariFindDuplicates()" title="Aynı isimde birden fazla kayıt var mı tara">
         🔍 Kopya Tara
+      </button>
+      <button class="btn btn-sm" style="background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.3);color:#a78bfa;" onclick="window.open('https://www.uyumsoft.com/kullanici-girisi','_blank')" title="Uyumsoft e-Fatura paneline yeni sekmede gider">
+        🧾 Uyumsoft'a Git
       </button>
     </div>
   </div>
