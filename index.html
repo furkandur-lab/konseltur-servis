@@ -1675,7 +1675,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-71</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-72</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -3188,10 +3188,6 @@ setInterval(updateLoginClock, 30000);
  <button class="btn btn-brand" onclick="goto('students')">Öğrenciler</button>
  <button class="btn btn-ghost" onclick="goto('drivers')" style="border-color:rgba(200,55,26,.3);color:var(--brand);">Şoförler</button>
  <button class="btn btn-ghost" onclick="goto('routes')" style="border-color:rgba(34,197,94,.3);color:var(--green);">Rotalar</button>
- <button class="btn btn-ghost" onclick="openGlobalSearch()" style="border-color:rgba(96,165,250,.3);color:#60a5fa;" title="Öğrenci, şoför, rota ve cari hesaplarda birlikte ara">
-   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:5px;vertical-align:-1px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-   Hızlı Ara
- </button>
  <button class="btn btn-ghost" onclick="_fullReloadFromServer()" style="border-color:rgba(148,163,184,.3);color:#94a3b8;" title="Bu cihazdaki tüm modüllerin (Rota, Cari, Ücret, Şoför, Görevler) kendi hafızasını atıp sunucudaki güncel veriyi yeniden çeker">
    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:5px;vertical-align:-1px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
    Tüm Uygulamayı Yenile
@@ -17209,6 +17205,14 @@ function openGlobalSearch(){
       loadCariData();
     }
   }catch(e){ console.warn('Hızlı Arama: Cari verisi önceden yüklenemedi', e); }
+  // Aynı sorun Öğrenci/Şoför/Rota (students/drivers/routes) için de vardı — bu veri
+  // sadece Rota Yönetimi'ne girildiğinde yükleniyordu. Ana sayfadan arama yapılırken
+  // de yüklensin diye burada da tetikleniyor.
+  try{
+    if(typeof students!=='undefined' && (!students || !students.length) && typeof loadData==='function'){
+      loadData();
+    }
+  }catch(e){ console.warn('Hızlı Arama: Öğrenci/Şoför verisi önceden yüklenemedi', e); }
 
   var old = document.getElementById('gsearch-screen');
   if(old) old.remove();
