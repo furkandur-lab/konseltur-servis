@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="app-version" content="202607101200">
+<meta name="color-scheme" content="dark">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -48,7 +49,7 @@
  --t-slow:.25s;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{height:100%;overflow:hidden;overflow-x:hidden;max-width:100vw;}
+html,body{height:100%;overflow:hidden;overflow-x:hidden;max-width:100vw;color-scheme:dark;}
 /* ÖNEMLİ: Mobilde önceden "overflow:visible" kullanılıyordu — bu, YATAY taşmayı da
    tamamen serbest bırakıyordu. Sayfadaki herhangi bir eleman (örn. sığmayan bir buton
    satırı) az bile geniş olsa, TÜM sayfa yana kayıp soldaki içerik kesiliyordu (bildirilen
@@ -1675,7 +1676,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-72</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-74</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -18177,9 +18178,19 @@ function _openAracTakipEkran(){
 
   document.body.appendChild(scr);
 
+  // Düzenleme formu, "araç kartının hemen altında düzenle" özelliği için geçici
+  // olarak listenin içine taşınabiliyor — ama liste her yeniden çizildiğinde
+  // (innerHTML ile) içindeki her şey silindiği için, formu kalıcı olarak kaybetmemek
+  // adına orijinal konumunu burada saklıyoruz. Form gizlenirken/kaydedilirken bu
+  // konuma geri taşınıyor (bkz. _atRestoreFormPosition).
+  var _atFormEl = document.getElementById('at-form');
+  window._atFormOriginalParent = _atFormEl.parentElement;
+  window._atFormOriginalNext = _atFormEl.nextSibling;
+
   // Event listener'lar
   document.getElementById('at-geri').addEventListener('click',function(){ document.body.removeChild(scr); _updateAracTakipOzet(); });
   document.getElementById('at-ekle-btn').addEventListener('click',function(){
+    _atRestoreFormPosition();
     document.getElementById('at-form-title').textContent='Yeni Araç Ekle';
     document.getElementById('at-edit-id').value='';
     ['at-plaka','at-tip','at-not'].forEach(function(id){document.getElementById(id).value='';});
@@ -18201,12 +18212,13 @@ function _openAracTakipEkran(){
   // Araç select'i doldur
   _atGiderSelectDoldur();
   document.getElementById('at-kaydet').addEventListener('click',_atSaveArac);
-  document.getElementById('at-iptal').addEventListener('click',function(){ document.getElementById('at-form').style.display='none'; });
+  document.getElementById('at-iptal').addEventListener('click',function(){ document.getElementById('at-form').style.display='none'; _atRestoreFormPosition(); });
 
   _atRenderListe();
 }
 
 function _atRenderListe(){
+  if(typeof _atRestoreFormPosition==='function') _atRestoreFormPosition();
   var el=document.getElementById('at-liste'); if(!el)return;
   var list=_loadAraclar();
   if(!list.length){el.innerHTML='<div style="color:rgba(255,255,255,.3);text-align:center;padding:60px 0;font-size:13px;">Henüz araç eklenmedi.<br><br>+ Araç Ekle butonuna tıklayın.</div>';return;}
@@ -18241,6 +18253,22 @@ function _atRenderListe(){
   }).join('');
 }
 
+// Düzenleme formunu, listenin içine taşınmışsa orijinal (üstteki) konumuna geri
+// getirir. _atRenderListe() her çağrıldığında #at-liste'nin İÇİNDEKİ HER ŞEYİ
+// (innerHTML ile) silip yeniden oluşturuyor — form o an listenin içinde kalmışsa
+// tamamen kaybolurdu. Bu yüzden listeyi yeniden çizmeden ÖNCE bu fonksiyon çağrılır.
+function _atRestoreFormPosition(){
+  var form = document.getElementById('at-form');
+  if(!form || !window._atFormOriginalParent) return;
+  if(form.parentElement !== window._atFormOriginalParent){
+    if(window._atFormOriginalNext && window._atFormOriginalNext.parentElement===window._atFormOriginalParent){
+      window._atFormOriginalParent.insertBefore(form, window._atFormOriginalNext);
+    } else {
+      window._atFormOriginalParent.appendChild(form);
+    }
+  }
+}
+
 function _atSaveArac(){
   var plaka=(document.getElementById('at-plaka').value||'').trim().toUpperCase();
   if(!plaka){if(typeof toast==='function')toast('Plaka zorunludur','error');return;}
@@ -18251,6 +18279,7 @@ function _atSaveArac(){
   else list.push(obj);
   _saveAraclar(list);
   document.getElementById('at-form').style.display='none';
+  _atRestoreFormPosition();  // ÖNEMLİ: listeyi yeniden çizmeden önce formu güvenli yere taşı
   _atRenderListe();
   if(typeof toast==='function')toast('Araç kaydedildi ✓','success');
 }
@@ -18264,7 +18293,16 @@ function _atEditArac(btn){var id=btn.getAttribute('data-id');
   document.getElementById('at-sigorta').value=a.sigorta||'';
   document.getElementById('at-muayene').value=a.muayene||'';
   document.getElementById('at-not').value=a.not||'';
-  document.getElementById('at-form').style.display='block';
+  var form=document.getElementById('at-form');
+  // Formu sayfanın en üstünde sabit tutmak yerine, tıklanan aracın KARTININ HEMEN
+  // ALTINA taşıyoruz — "düzenle dediğimde en üste sıçrıyor" hatasının çözümü budur.
+  // Buton → buton satırı → başlık satırı → kartın kendisi (3 seviye yukarı)
+  var kart = btn.parentElement && btn.parentElement.parentElement && btn.parentElement.parentElement.parentElement;
+  if(kart && kart.parentElement){
+    kart.insertAdjacentElement('afterend', form);
+  }
+  form.style.display='block';
+  form.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 function _atDeleteArac(btn){var id=btn.getAttribute('data-id');
