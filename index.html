@@ -76,6 +76,11 @@ html,body{height:100%;overflow:hidden;overflow-x:hidden;max-width:100vw;color-sc
     yakınlaştırmayı baştan engelliyoruz.
  */
  input,textarea,select{font-size:16px!important;}
+ /* Gelir-Gider satırları: mobilde isim alanı tam genişlikte kendi satırında,
+    tutar kutuları/net/silme ikinci satırda sağa yaslı — aksi halde 5 öğe tek
+    satıra sıkışıp isim alanı neredeyse görünmez hale geliyordu */
+ .gg-isim-input{ flex-basis:100%!important; }
+ .gg-amt-group{ flex:1 1 100%!important; justify-content:flex-end!important; }
  /* Sol alttaki yüzen butonlar (Takvim, Hesap Makinesi, KDV, Uyumsoft, Arvento) artık
     5 taneye çıktığı için, dar ekranlarda sıkışmasınlar diye biraz küçültülüp aralık
     daraltılıyor — masaüstündeki gibi tek sırada, sadece daha küçük ve sık aralıklı */
@@ -1676,7 +1681,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.18-74</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-76</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -3275,7 +3280,6 @@ setInterval(updateLoginClock, 30000);
  <button class="btn btn-ghost btn-sm" onclick="document.getElementById('servis-assign-input').click()">📋 Servis Excel'den Ata</button>
  <input type="file" id="servis-assign-input" accept=".xlsx,.xls" style="display:none;" onchange="assignServiceFromExcel(event)">
  <button class="btn btn-ghost btn-sm" onclick="exportOgrenciExcel()">Excel Aktar</button>
- <button class="btn btn-sm" style="background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);color:#34d399;" onclick="openVeliBasvurulari()">👨‍👩‍👧 Veli Başvuruları</button>
  <button class="btn btn-red btn-sm" onclick="clearStudents()">Temizle</button>
  </div>
  </div>
@@ -3401,7 +3405,6 @@ setInterval(updateLoginClock, 30000);
  <button class="btn btn-ghost btn-sm" onclick="refreshAllCoords()" style="display:flex;align-items:center;gap:5px;" title="Tüm öğrencilerin mahalle koordinatını veritabanına göre yeniden hesaplar">📍 Koordinatları Yenile</button>
  <button class="btn btn-ghost btn-sm" onclick="checkCoordIssues()" style="display:flex;align-items:center;gap:5px;" title="Mahalle koordinatı bulunamayan / tahmini konuma düşen öğrencileri listeler">🧭 Koordinat Kontrolü</button>
  <button class="btn btn-ghost btn-sm" onclick="exportRotalarPDF()" style="display:flex;align-items:center;gap:5px;">PDF'e Aktar</button>
- <button class="btn btn-sm" style="background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);color:#34d399;" onclick="openVeliBasvurulari()">👨‍👩‍👧 Veli Başvuruları</button>
  </div>
  </div>
 
@@ -3669,10 +3672,6 @@ setInterval(updateLoginClock, 30000);
       <div style="font-size:12px;color:var(--muted2);margin-top:3px;">Alınan / Verilen takibi ve cari hesap yönetimi</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <button id="cari-sofor-aktar-btn" class="btn btn-sm" style="display:none;background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#a78bfa;" onclick="openImportSoforModal()">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Şoförlerden Personel Aktar
-      </button>
       <button id="btn-cari-yeni" class="btn btn-sm" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);color:#60a5fa;" onclick="openCariAddModal()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Yeni Cari
@@ -3685,13 +3684,6 @@ setInterval(updateLoginClock, 30000);
       <button class="btn btn-ghost btn-sm" onclick="exportCariExcel()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Excel
-      </button>
-      <button class="btn btn-ghost btn-sm" onclick="_cariReloadFromServer()" title="Bu cihazın kendi hafızasını atıp sunucudaki güncel veriyi yeniden çeker">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        Sunucudan Yenile
-      </button>
-      <button class="btn btn-sm" style="background:rgba(251,146,60,.08);border-color:rgba(251,146,60,.3);color:#fb923c;" onclick="_cariFindDuplicates()" title="Aynı isimde birden fazla kayıt var mı tara">
-        🔍 Kopya Tara
       </button>
     </div>
   </div>
@@ -5852,6 +5844,58 @@ function filterNotes(f, btn){
   renderNotes();
 }
 
+// ── NOT DEFTERİ — SUNUCU SENKRONİZASYONU ──
+// Daha önce bu notlar sadece bu cihazda saklanıyordu (hassas şifre notları için
+// bilerek böyleydi). Kullanıcı isteği üzerine artık Firebase'e de senkronlanıyor —
+// yani PC'de eklenen bir not artık mobilde de görünür. NOT: bu, hassas içeriklerin
+// (şifreler vb.) artık sunucuda da saklandığı anlamına gelir.
+let _lastNotesSaveAt = 0;
+window._notesFbSynced = false;
+
+function _notesLoad(){
+  const reqTime = Date.now();
+  const _doLoad = () => {
+    if(!window._fbDb || !window._fbRef || !window._fbOnValue) return;
+    if(window._fbNotesUnsub){ try{ window._fbNotesUnsub(); }catch(e){} }
+    window._fbNotesUnsub = window._fbOnValue(window._fbRef(window._fbDb,'konseltur/GLOBAL/notes'), snap => {
+      window._notesFbSynced = true;
+      // Yarış durumu koruması: bu dinleyici kurulduktan SONRA yerel bir kayıt
+      // yapıldıysa, gelen anlık görüntü muhtemelen eski/gecikmelidir — üzerine yazma
+      if(Date.now() - _lastNotesSaveAt < 4000) return;
+      const val = snap && snap.exists() ? snap.val() : null;
+      const remoteArr = val ? Object.values(val) : [];
+      const localArr = _safeParseLS('_konseltur_notes', []);
+      // Not bazında birleştirme: aynı id her iki tarafta da varsa, hangisi daha
+      // yakın zamanda güncellendiyse (updatedAt) o kazanır — bir cihazda düzenlenen
+      // notun diğer cihazdan gelen eski kopyayla ezilmesini önler
+      const merged = {};
+      localArr.forEach(n => { merged[n.id] = n; });
+      remoteArr.forEach(n => {
+        const l = merged[n.id];
+        if(!l || (Number(n.updatedAt)||0) >= (Number(l.updatedAt)||0)) merged[n.id] = n;
+      });
+      const mergedArr = Object.values(merged).sort((a,b)=> (b.id||0)-(a.id||0));
+      try{ localStorage.setItem('_konseltur_notes', JSON.stringify(mergedArr)); }catch(e){}
+      const modal = document.getElementById('notepad-modal');
+      if(modal && modal.style.display !== 'none') renderNotes();
+    });
+  };
+  if(window._fbReady) _doLoad();
+  else window.addEventListener('firebase-ready', _doLoad, {once:true});
+}
+window.addEventListener('load', ()=>{ try{ _notesLoad(); }catch(e){} });
+
+async function _notesSave(notes){
+  _lastNotesSaveAt = Date.now();
+  try{ localStorage.setItem('_konseltur_notes', JSON.stringify(notes)); }catch(e){}
+  if(!window._fbDb || !window._fbRef || !window._fbSet){
+    throw new Error('Firebase hazır değil (internet bağlantısı veya oturum sorunu olabilir)');
+  }
+  const asObj = {};
+  notes.forEach(n => { asObj[n.id] = n; });
+  await window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/notes'), asObj);
+}
+
 function openNotepad(){
   document.getElementById('notepad-modal').style.display='flex';
   renderNotes();
@@ -5865,7 +5909,7 @@ function closeNotepad(){
 function handleNotepadBackdrop(e){
   if(e.target.id==='notepad-modal') closeNotepad();
 }
-function addNote(){
+async function addNote(){
   const title = (document.getElementById('notepad-title').value||'').trim();
   const body = (document.getElementById('notepad-content').value||'').trim();
   if(!title && !body){ 
@@ -5876,7 +5920,7 @@ function addNote(){
   const tag = document.getElementById('notepad-tag').value||'';
   const editIdRaw = document.getElementById('notepad-edit-id').value||'';
   const notes = _safeParseLS('_konseltur_notes', []);
-  let msg = '✅ Not eklendi';
+  let msg = '✅ Not eklendi ve sunucuya kaydedildi';
   if(editIdRaw){
     // Düzenleme modu: mevcut notu güncelle (tarihi de "düzenlendi" olarak yenile)
     const editId = Number(editIdRaw);
@@ -5886,16 +5930,22 @@ function addNote(){
       notes[idx].content = body;
       notes[idx].tag = tag;
       notes[idx].date = new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}) + ' (düzenlendi)';
-      msg = '✅ Not güncellendi';
+      notes[idx].updatedAt = Date.now();
+      msg = '✅ Not güncellendi ve sunucuya kaydedildi';
     }
   } else {
     notes.unshift({id:Date.now(), title:title||'Başlıksız', content:body, tag,
-      date:new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})});
+      date:new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}), updatedAt:Date.now()});
   }
-  localStorage.setItem('_konseltur_notes', JSON.stringify(notes));
-  cancelEditNote(); // formu ve düzenleme durumunu sıfırla
-  renderNotes();
-  if(typeof toast==='function') toast(msg,'success');
+  try{
+    await _notesSave(notes);
+    cancelEditNote(); // formu ve düzenleme durumunu sıfırla
+    renderNotes();
+    if(typeof toast==='function') toast(msg,'success');
+  }catch(e){
+    console.error('Not kaydedilemedi:', e);
+    if(typeof toast==='function') toast('❌ SUNUCUYA KAYDEDİLEMEDİ: '+(e.message||'bilinmeyen hata')+' — internet bağlantınızı kontrol edip tekrar deneyin','error');
+  }
 }
 // Bir notu düzenlemek için formu doldurur ve "düzenleme modu"na geçer
 function editNote(id){
@@ -5934,10 +5984,17 @@ function cancelEditNote(){
   const btn = document.getElementById('notepad-submit-btn');
   if(btn) btn.textContent = 'Ekle';
 }
-function deleteNote(id){
+async function deleteNote(id){
   const notes = _safeParseLS('_konseltur_notes', []).filter(n=>n.id!==id);
-  localStorage.setItem('_konseltur_notes', JSON.stringify(notes));
-  renderNotes();
+  try{
+    await _notesSave(notes);
+    renderNotes();
+    if(typeof toast==='function') toast('✅ Not silindi ve sunucuya kaydedildi','success');
+  }catch(e){
+    console.error('Not silme kaydedilemedi:', e);
+    if(typeof toast==='function') toast('❌ SUNUCUYA KAYDEDİLEMEDİ: '+(e.message||'bilinmeyen hata'),'error');
+    renderNotes();
+  }
 }
 // Hangi notların "devamını gör" ile genişletildiğini oturum boyunca hatırlar
 window._expandedNotes = window._expandedNotes || new Set();
@@ -14512,7 +14569,7 @@ document.addEventListener('DOMContentLoaded',function(){
 </div>
 
 <!-- CARİ HAREKET GİRİŞİ MODAL -->
-<div class="modal-bg" id="cari-hareket-modal" onclick="if(event.target===this){document.getElementById('cari-hareket-modal').classList.remove('open')}">
+<div class="modal-bg" id="cari-hareket-modal">
   <div class="modal" style="width:480px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
       <div>
@@ -14729,9 +14786,19 @@ function _fmtPara(n){
 function _formatMoneyInput(el){
   const cursorPos = el.selectionStart;
   const oldVal = el.value;
+  // Kuruş (virgülden sonraki kısım) desteği: virgülü sınırla (sadece ilk virgül
+  // sayılır, en fazla 2 basamak), virgülden ÖNCEKİ kısma binlik nokta ayracı ekle.
+  const commaIdx = oldVal.indexOf(',');
+  let intPart, decPart = null;
+  if(commaIdx >= 0){
+    intPart = oldVal.slice(0, commaIdx).replace(/[^0-9]/g,'');
+    decPart = oldVal.slice(commaIdx+1).replace(/[^0-9]/g,'').slice(0,2);
+  } else {
+    intPart = oldVal.replace(/[^0-9]/g,'');
+  }
   const digitsBeforeCursor = oldVal.slice(0, cursorPos).replace(/[^0-9]/g,'').length;
-  const digits = oldVal.replace(/[^0-9]/g,'');
-  const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const formatted = decPart !== null ? (formattedInt + ',' + decPart) : formattedInt;
   el.value = formatted;
   let count = 0, newPos = formatted.length;
   if(digitsBeforeCursor === 0){ newPos = 0; }
@@ -14745,17 +14812,32 @@ function _formatMoneyInput(el){
     try{ el.setSelectionRange(newPos, newPos); }catch(e){}
   }
 }
-// Ham bir sayıyı ("25000") noktalı gösterim metnine ("25.000") çevirir —
-// bir alanı JS ile programatik olarak DOLDURURKEN (kullanıcı yazmadan) kullanılır
+// Ham bir sayıyı ("25000" veya "25000.5") noktalı gösterim metnine ("25.000" veya
+// "25.000,50") çevirir — bir alanı JS ile programatik olarak DOLDURURKEN
+// (kullanıcı yazmadan) kullanılır
 function _toMoneyStr(n){
   if(n===null||n===undefined||n==='') return '';
-  const digits = Math.round(Number(n)||0).toString();
-  return digits.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  const num = Number(n)||0;
+  const intPart = Math.trunc(Math.abs(num));
+  const decPart = Math.round((Math.abs(num) - intPart) * 100);
+  const intStr = intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  const sign = num<0 ? '-' : '';
+  return decPart>0 ? sign+intStr+','+String(decPart).padStart(2,'0') : sign+intStr;
 }
-// Biçimlendirilmiş ("25.000") bir metni ham sayıya çevirir (25000)
+// Biçimlendirilmiş ("25.000" veya "25.000,50") bir metni ham sayıya çevirir
+// (25000 veya 25000.5) — kuruş varsa ondalık olarak korunur
 function _parseMoneyInput(val){
   if(val===null || val===undefined) return 0;
-  const digits = val.toString().replace(/[^0-9]/g,'');
+  const s = val.toString();
+  const commaIdx = s.indexOf(',');
+  if(commaIdx >= 0){
+    const intDigits = s.slice(0,commaIdx).replace(/[^0-9]/g,'');
+    const decDigits = s.slice(commaIdx+1).replace(/[^0-9]/g,'').slice(0,2);
+    const whole = intDigits ? parseInt(intDigits,10) : 0;
+    const cents = decDigits ? parseInt(decDigits.padEnd(2,'0'),10) : 0;
+    return whole + cents/100;
+  }
+  const digits = s.replace(/[^0-9]/g,'');
   return digits ? parseInt(digits,10) : 0;
 }
 
@@ -18141,9 +18223,7 @@ function _openAracTakipEkran(){
             +'<div style="font-size:11px;color:rgba(255,255,255,.4);">Sigorta, Muayene & Giderler</div>'
           +'</div>'
         +'</div>'
-        +'<input type="file" id="at-import-file" accept=".xlsx,.xls" style="display:none;" onchange="_atImportExcel(event)">'
         +'<div style="display:flex;gap:8px;">'
-        +'<button onclick="document.getElementById(\'at-import-file\').click()" style="padding:9px 14px;border-radius:10px;border:1px solid rgba(45,212,191,.35);background:rgba(45,212,191,.1);color:#2dd4bf;font-size:12px;font-weight:700;cursor:pointer;">📥 Excel\'den İçe Aktar</button>'
         +'<button id="at-ekle-btn" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(14,165,233,.4);background:rgba(14,165,233,.1);color:#38bdf8;font-size:12px;font-weight:700;cursor:pointer;">+ Araç Ekle</button>'
         +'</div>'
       +'</div>'
@@ -18702,12 +18782,14 @@ function _ggRenderAy(){
       var net = _ggNetOf(r);
       var deger = grup==='servis' ? (r.gider||0) : (r.gelir||0);
       var karsiDeger = grup==='servis' ? (r.gelir||0) : (r.gider||0);
-      return '<div id="gg-row-'+r.id+'" style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);">'
-        +'<input value="'+escHtml(r.isim||'')+'" placeholder="Hesap adı" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'isim\',this.value)" style="flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:7px 9px;color:#fff;font-size:12px;">'
-        +'<input type="text" inputmode="numeric" value="'+_ggFormatNum(deger)+'" placeholder="'+alanAdi+'" title="'+alanAdi+'" oninput="_ggOnAmountInput(this,\''+ay+'\',\''+r.id+'\',\''+(grup==='servis'?'gider':'gelir')+'\')" style="width:100px;background:'+alanRengi.bg+';border:1px solid '+alanRengi.border+';border-radius:7px;padding:7px 9px;color:'+alanRengi.text+';font-size:12px;text-align:right;">'
-        +'<input type="text" inputmode="numeric" value="'+_ggFormatNum(karsiDeger)+'" placeholder="'+karsiAd+'" title="Karşı taraf: '+karsiAd+'" oninput="_ggOnAmountInput(this,\''+ay+'\',\''+r.id+'\',\''+karsiAlan+'\')" style="width:100px;background:'+karsiRenk.bg+';border:1px dashed '+karsiRenk.border+';border-radius:7px;padding:7px 9px;color:'+karsiRenk.text+';font-size:12px;text-align:right;opacity:.75;">'
-        +'<div id="gg-net-'+r.id+'" style="width:90px;text-align:right;font-size:12px;font-weight:700;color:'+(net>=0?'#60a5fa':'#f87171')+';">₺'+_ggFormatNum(Math.abs(net))+(net<0?' -':'')+'</div>'
-        +'<button onclick="_ggDeleteRow(\''+ay+'\',\''+r.id+'\')" style="width:28px;height:28px;flex-shrink:0;border-radius:7px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:#f87171;cursor:pointer;font-size:14px;">×</button>'
+      return '<div id="gg-row-'+r.id+'" class="gg-row" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);">'
+        +'<input class="gg-isim-input" value="'+escHtml(r.isim||'')+'" placeholder="Hesap adı" oninput="_ggField(\''+ay+'\',\''+r.id+'\',\'isim\',this.value)" style="flex:1;min-width:120px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:7px 9px;color:#fff;font-size:12px;">'
+        +'<div class="gg-amt-group" style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'
+          +'<input type="text" inputmode="numeric" value="'+_ggFormatNum(deger)+'" placeholder="'+alanAdi+'" title="'+alanAdi+'" oninput="_ggOnAmountInput(this,\''+ay+'\',\''+r.id+'\',\''+(grup==='servis'?'gider':'gelir')+'\')" style="width:100px;background:'+alanRengi.bg+';border:1px solid '+alanRengi.border+';border-radius:7px;padding:7px 9px;color:'+alanRengi.text+';font-size:12px;text-align:right;">'
+          +'<input type="text" inputmode="numeric" value="'+_ggFormatNum(karsiDeger)+'" placeholder="'+karsiAd+'" title="Karşı taraf: '+karsiAd+'" oninput="_ggOnAmountInput(this,\''+ay+'\',\''+r.id+'\',\''+karsiAlan+'\')" style="width:100px;background:'+karsiRenk.bg+';border:1px dashed '+karsiRenk.border+';border-radius:7px;padding:7px 9px;color:'+karsiRenk.text+';font-size:12px;text-align:right;opacity:.75;">'
+          +'<div id="gg-net-'+r.id+'" style="width:90px;text-align:right;font-size:12px;font-weight:700;color:'+(net>=0?'#60a5fa':'#f87171')+';">₺'+_ggFormatNum(Math.abs(net))+(net<0?' -':'')+'</div>'
+          +'<button onclick="_ggDeleteRow(\''+ay+'\',\''+r.id+'\')" style="width:28px;height:28px;flex-shrink:0;border-radius:7px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:#f87171;cursor:pointer;font-size:14px;">×</button>'
+        +'</div>'
       +'</div>';
     }).join('');
     return '<div style="background:#0e1420;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:16px;margin-bottom:14px;">'
