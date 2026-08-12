@@ -1695,7 +1695,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-78</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-79</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -6116,6 +6116,21 @@ function calcInput(k){
  if(disp) disp.value=_calcResult;
  if(!_calcJustEvaled && expr) expr.textContent=_calcExpr;
 }
+// Hesap makinesi klavye desteği: makine açıkken (ve başka bir kutuya yazmıyorken)
+// klavyeden rakam/işlem tuşlarıyla da hesap yapılabilsin
+document.addEventListener('keydown', function(e){
+  var w = document.getElementById('calc-widget');
+  if(!w || w.style.opacity !== '1') return;
+  var ae = document.activeElement;
+  var aeTag = ae ? ae.tagName : '';
+  // Başka bir metin kutusuna yazarken (Tutar, Açıklama vb.) bu kısayolları devreye sokma
+  if(aeTag==='INPUT' || aeTag==='TEXTAREA' || (ae && ae.isContentEditable)) return;
+  if(/^[0-9]$/.test(e.key)){ calcInput(e.key); e.preventDefault(); }
+  else if(['+','-','*','/','.'].includes(e.key)){ calcInput(e.key); e.preventDefault(); }
+  else if(e.key==='Enter' || e.key==='='){ calcInput('='); e.preventDefault(); }
+  else if(e.key==='Backspace'){ calcInput('back'); e.preventDefault(); }
+  else if(e.key==='Escape' || e.key==='c' || e.key==='C'){ calcInput('C'); e.preventDefault(); }
+});
 
 function toggleCalendar(){
   const w = document.getElementById('calendar-widget');
