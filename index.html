@@ -1695,7 +1695,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-82</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-83</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -4364,6 +4364,17 @@ async function _saveBackupBlob(blob, filename){
         const writable = await fileHandle.createWritable();
         await writable.write(blob);
         await writable.close();
+        // Yeni yedek başarıyla yazıldıktan SONRA bir önceki yedeği sil — klasörde
+        // sadece en güncel yedek kalsın, dosyalar birikmesin. Silme işlemi yazma
+        // BAŞARILI OLDUKTAN SONRA yapılıyor, böylece bir sorun çıkarsa eski yedek
+        // kaybolmuş olmaz.
+        try{
+          const prevFilename = localStorage.getItem('konseltur_last_backup_filename');
+          if(prevFilename && prevFilename !== filename){
+            await handle.removeEntry(prevFilename);
+          }
+        }catch(e){ console.warn('Önceki yedek silinemedi (önemli değil):', e); }
+        try{ localStorage.setItem('konseltur_last_backup_filename', filename); }catch(e){}
         if(typeof toast==='function') toast('💾 Yedek "'+handle.name+'" klasörüne kaydedildi: '+filename,'success');
         return;
       }
@@ -4371,7 +4382,8 @@ async function _saveBackupBlob(blob, filename){
   }catch(e){
     console.warn('Seçili klasöre yazma başarısız, normal indirmeye geçiliyor:', e);
   }
-  // Yedek yöntem: normal tarayıcı indirmesi (Downloads klasörü)
+  // Yedek yöntem: normal tarayıcı indirmesi (Downloads klasörü) — burada eski
+  // dosyayı silme imkanı yok (web sayfası Downloads klasörüne bu izne sahip değil)
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
