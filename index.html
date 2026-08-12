@@ -81,6 +81,14 @@ html,body{height:100%;overflow:hidden;overflow-x:hidden;max-width:100vw;color-sc
     satıra sıkışıp isim alanı neredeyse görünmez hale geliyordu */
  .gg-isim-input{ flex-basis:100%!important; }
  .gg-amt-group{ flex:1 1 100%!important; justify-content:flex-end!important; }
+ /* Gelir-Gider Toplam Gelir/Gider/Net kartları: büyük rakamlar dar ekranda komşu
+    karta taşıp üst üste biniyordu — kart küçülüyordu ama içindeki metin küçülmüyordu */
+ #gg-tot-gelir, #gg-tot-gider, #gg-tot-net{
+   font-size:13px!important;
+   overflow-wrap:break-word!important;
+   word-break:break-word!important;
+   line-height:1.25!important;
+ }
  /* Sol alttaki yüzen butonlar (Takvim, Hesap Makinesi, KDV, Uyumsoft, Arvento) artık
     5 taneye çıktığı için, dar ekranlarda sıkışmasınlar diye biraz küçültülüp aralık
     daraltılıyor — masaüstündeki gibi tek sırada, sadece daha küçük ve sık aralıklı */
@@ -1331,6 +1339,12 @@ body.light .pm-group-label { color: rgba(0,0,0,.3); border-bottom-color: rgba(0,
   #cdet-bakiye-ozet > div { min-width:0 !important; }
   #cdet-bakiye-ozet > div > div:last-child { overflow-wrap:break-word !important; word-break:break-word !important; font-size:16px !important; }
   #cdet-bakiye-ozet { grid-template-columns:1fr 1fr !important; }
+  /* Gelir-Gider Takibi'nde "Toplam Gelir/Gider/Net" kartları mobilde üst üste
+     biniyordu — aynı CSS Grid min-width:auto tuzağı. 2 sütun + daha küçük yazı
+     boyutu ile taşma engelleniyor */
+  #gg-totals > div { grid-template-columns:1fr 1fr !important; }
+  #gg-totals > div > div { min-width:0 !important; padding:10px !important; }
+  #gg-totals > div > div > div:last-child { font-size:14px !important; overflow-wrap:break-word !important; word-break:break-word !important; }
 
   /* NAV */
   :root { --nav-h:auto !important; }
@@ -1681,7 +1695,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-76</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-78</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -5865,6 +5879,20 @@ function _notesLoad(){
       const val = snap && snap.exists() ? snap.val() : null;
       const remoteArr = val ? Object.values(val) : [];
       const localArr = _safeParseLS('_konseltur_notes', []);
+      // TEK SEFERLİK GEÇİŞ: Firebase'de hiç not yoksa ama bu cihazda (senkron
+      // özelliği eklenmeden önce oluşturulmuş) yerel notlar varsa, bunları BİR KEZ
+      // sunucuya gönder — aksi halde eski notlar hiçbir zaman diğer cihaza ulaşmazdı
+      // (mobilde hiçbir şey görünmüyordu, çünkü sunucuda gerçekten hiçbir şey yoktu).
+      if(!val && localArr.length){
+        const seedObj = {};
+        localArr.forEach(n => { if(!n.updatedAt) n.updatedAt = n.id||Date.now(); seedObj[n.id] = n; });
+        _lastNotesSaveAt = Date.now();
+        try{ localStorage.setItem('_konseltur_notes', JSON.stringify(localArr)); }catch(e){}
+        window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/notes'), seedObj).catch(function(e){
+          console.warn('Not Defteri ilk senkron gönderimi başarısız:', e);
+        });
+        return;
+      }
       // Not bazında birleştirme: aynı id her iki tarafta da varsa, hangisi daha
       // yakın zamanda güncellendiyse (updatedAt) o kazanır — bir cihazda düzenlenen
       // notun diğer cihazdan gelen eski kopyayla ezilmesini önler
@@ -5898,6 +5926,10 @@ async function _notesSave(notes){
 
 function openNotepad(){
   document.getElementById('notepad-modal').style.display='flex';
+  // Ekstra güvenlik: her açılışta senkronizasyonu tazele — sayfa yüklenirken
+  // tetiklenen ilk senkronizasyon herhangi bir sebeple kaçırılmışsa (örn. Firebase
+  // henüz hazır değilken) burada tekrar denenir
+  try{ _notesLoad(); }catch(e){}
   renderNotes();
   // Input alanını odakla
   setTimeout(()=>{ const t=document.getElementById('notepad-title'); if(t) t.focus(); }, 100);
