@@ -1695,7 +1695,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-79</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-81</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -2711,6 +2711,10 @@ function _addManagedListener(target, event, handler, options) {
           <button onclick="openGlobalSearch()" title="Öğrenci, şoför, rota ve cari hesaplarda birlikte ara" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);color:#60a5fa;font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;" onmouseover="this.style.background='rgba(96,165,250,.16)'" onmouseout="this.style.background='rgba(96,165,250,.07)'">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Hızlı Ara
+          </button>
+          <button onclick="chooseBackupFolder()" title="Yedeklerin otomatik kaydedileceği klasörü seçin (örn. D:\Yedek) — sadece Chrome/Edge'de çalışır" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.07);color:#fbbf24;font-size:12px;font-weight:700;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.16)'" onmouseout="this.style.background='rgba(245,158,11,.07)'">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Yedek Klasörünü Seç
           </button>
           <input type="file" id="login-import-input" accept=".json" style="display:none;" onchange="importDataFromLogin(event)">
         </div>
@@ -4298,7 +4302,93 @@ setInterval(updateLoginClock, 30000);
 
 
 // LOGIN EKRANI YEDEKLEME 
+// ── OTOMATİK YEDEK KLASÖRÜ (D:\Yedek gibi) ──
+// Tarayıcılar güvenlik gereği bir web sayfasının rastgele bir klasöre yazmasına
+// izin vermez — kullanıcının EN AZ BİR KEZ o klasörü elle seçip izin vermesi
+// gerekir (File System Access API, sadece Chrome/Edge destekliyor). Bu izin,
+// tarayıcıda kalıcı olarak saklanabiliyor (IndexedDB ile), böylece bir kere
+// seçtikten sonra sonraki otomatik yedeklemeler o klasöre sessizce yazılabiliyor.
+function _idbOpen(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open('konseltur_fsdb', 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore('handles'); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function _idbSet(key, val){
+  const db = await _idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('handles','readwrite');
+    tx.objectStore('handles').put(val, key);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function _idbGet(key){
+  const db = await _idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('handles','readonly');
+    const req = tx.objectStore('handles').get(key);
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+
+// Kullanıcının "Yedek Klasörünü Seç" butonuna basmasıyla çalışır — D:\Yedek gibi
+// bir klasör seçip izin vermesini sağlar, sonraki yedeklemeler oraya gider
+async function chooseBackupFolder(){
+  if(!window.showDirectoryPicker){
+    if(typeof toast==='function') toast('❌ Bu özellik sadece Chrome/Edge tarayıcısında çalışıyor','error');
+    else alert('Bu özellik sadece Chrome/Edge tarayıcısında çalışıyor');
+    return;
+  }
+  try{
+    const handle = await window.showDirectoryPicker({id:'konseltur-yedek', mode:'readwrite'});
+    await _idbSet('backupDirHandle', handle);
+    if(typeof toast==='function') toast('✅ Yedek klasörü ayarlandı: "'+handle.name+'" — sonraki yedekler otomatik buraya kaydedilecek','success');
+  }catch(e){
+    if(e && e.name !== 'AbortError') console.warn('Klasör seçme hatası:', e);
+  }
+}
+
+// Yedek dosyasını kaydeder: önce daha önce seçilmiş klasöre yazmayı dener,
+// olmazsa (klasör hiç seçilmemişse, izin verilmemişse veya tarayıcı desteklemiyorsa)
+// normal tarayıcı indirme yöntemine (Downloads klasörü) düşer
+async function _saveBackupBlob(blob, filename){
+  try{
+    const handle = await _idbGet('backupDirHandle');
+    if(handle && window.showDirectoryPicker){
+      let perm = await handle.queryPermission({mode:'readwrite'});
+      if(perm !== 'granted'){
+        try{ perm = await handle.requestPermission({mode:'readwrite'}); }catch(e){ /* kullanıcı etkileşimi olmadan izin istenemedi */ }
+      }
+      if(perm === 'granted'){
+        const fileHandle = await handle.getFileHandle(filename, {create:true});
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        if(typeof toast==='function') toast('💾 Yedek "'+handle.name+'" klasörüne kaydedildi: '+filename,'success');
+        return;
+      }
+    }
+  }catch(e){
+    console.warn('Seçili klasöre yazma başarısız, normal indirmeye geçiliyor:', e);
+  }
+  // Yedek yöntem: normal tarayıcı indirmesi (Downloads klasörü)
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  if(typeof toast==='function') toast('💾 Yedek indirildi: '+filename+' (Downloads klasörü — özel bir klasör için "Yedek Klasörünü Seç"i kullanın)','success');
+}
+
 function exportDataFromLogin(){
+ exportData();
+}
+function _exportDataFromLogin_OLD(){
  var allData = {};
  var totalStudents = 0, totalDrivers = 0;
 
@@ -9443,30 +9533,31 @@ function _renderOverduePanel(){
 // ── Yedekleme Hatırlatma ─────────────────────────────────────
 function _checkBackupReminder(){
  const banner = document.getElementById('dash-backup-reminder');
- if(!banner) return;
- const titleEl = document.getElementById('backup-reminder-title');
- const subEl   = document.getElementById('backup-reminder-sub');
  try{
   const lastBackup = localStorage.getItem('konseltur_last_backup');
-  const UYARI_GUNU = 7; // 7 günde bir uyar
-  if(!lastBackup){
-   // Hiç yedek alınmamış
-   if(students.length > 0 || Object.keys(payments).length > 0){
-    if(titleEl) titleEl.textContent = 'Henüz hiç yedek almadınız!';
-    if(subEl)   subEl.textContent   = students.length + ' öğrenci ve ödeme verisi sadece bu tarayıcıda. Hemen yedekleyin.';
-    banner.style.display = 'flex';
-   }
-   return;
+  const OTOMATIK_GUNU = 7; // 7 günde bir otomatik yedek al
+  const hasData = students.length > 0 || Object.keys(payments).length > 0;
+  if(!hasData) return;
+
+  let gunFarki = Infinity;
+  if(lastBackup){
+    gunFarki = Math.floor((Date.now() - new Date(lastBackup).getTime()) / (1000*60*60*24));
   }
-  const gunFarki = Math.floor((Date.now() - new Date(lastBackup).getTime()) / (1000*60*60*24));
-  if(gunFarki >= UYARI_GUNU){
-   if(titleEl) titleEl.textContent = gunFarki + ' gündür yedek almadınız';
-   if(subEl)   subEl.textContent   = 'Son yedek: ' + new Date(lastBackup).toLocaleDateString('tr-TR') + ' · Verilerinizi kaybetmemek için yedekleyin.';
-   banner.style.display = 'flex';
-  } else {
-   banner.style.display = 'none';
+
+  if(gunFarki >= OTOMATIK_GUNU){
+    // ÖNEMLİ SINIR: Bir web sayfası, kapalıyken veya siz kullanmıyorken kendiliğinden
+    // dosya indiremez — bu tarayıcıların güvenlik kuralı, hiçbir web uygulaması bunu
+    // aşamaz. Bunun yerine en pratik çözüm: siz uygulamayı HER AÇTIĞINIZDA, son
+    // yedekten bu yana 7+ gün geçmişse, hiçbir tıklama gerektirmeden otomatik olarak
+    // bir yedek dosyası indiriliyor. Yani "arka planda her gün" değil, "siz uygulamayı
+    // her açtığınızda, yeterince zaman geçtiyse" otomatik çalışır.
+    try{
+      exportData();
+      if(typeof toast==='function') toast('💾 Otomatik yedek alındı ('+gunFarki+' gün sonra)','success');
+    }catch(e){ console.warn('Otomatik yedekleme başarısız:', e); }
   }
- }catch(e){ banner.style.display = 'none'; }
+  if(banner) banner.style.display = 'none';
+ }catch(e){ if(banner) banner.style.display = 'none'; }
 }
 
 // 
@@ -10919,40 +11010,54 @@ function exportData(){
  getAllSchoolKeys().forEach(key => {
  const mainRaw = localStorage.getItem('konseltur_main_v2_' + key);
  const payRaw = localStorage.getItem('konseltur_pay_v2_' + key);
+ const gorevRaw = localStorage.getItem('konseltur_gorev_v1_' + key);
  const mainObj = mainRaw ? JSON.parse(mainRaw) : null;
  const payObj = payRaw ? JSON.parse(payRaw) : null;
  if(mainObj?.students) totalStudents += mainObj.students.length;
  if(mainObj?.drivers) totalDrivers += mainObj.drivers.length;
- allData[key] = { main: mainObj, pay: payObj };
+ allData[key] = { main: mainObj, pay: payObj, gorev: gorevRaw ? JSON.parse(gorevRaw) : null };
  });
 
+ // Diğer tüm modüller (bunlar okul bağımsız, GLOBAL olarak saklanıyor)
+ function _lsJson(key){ try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }catch(e){ return null; } }
+ const digerModuller = {
+   cari: _lsJson('konseltur_cari_v1_GLOBAL'),
+   sofor: _lsJson('konseltur_sofor_v1_GLOBAL'),
+   soforPay: _lsJson('konseltur_soforpay_v1_GLOBAL'),
+   gelirGider: _lsJson('konseltur_gg_v1_GLOBAL'),
+   aracTakip: _lsJson('konseltur_arac_takip_v1'),
+   aracGider: _lsJson('konseltur_arac_gider_v1'),
+   trash: _lsJson('konseltur_trash_v1'),
+   notlar: _lsJson('_konseltur_notes'),
+   isBasvurulari: _lsJson('konseltur_basvuru_v1')
+ };
+
  const payload = {
- version: 'konseltur_backup_v2',
+ version: 'konseltur_backup_v3',
  exportedAt: new Date().toISOString(),
  exportedBy: _activeSchoolKey,
  checksum: { totalStudents, totalDrivers, schoolCount: SCHOOLS.length },
  schools: JSON.parse(JSON.stringify(SCHOOLS)),
- data: allData
+ data: allData,
+ digerModuller: digerModuller
  };
 
  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
- const url = URL.createObjectURL(blob);
- const a = document.createElement('a');
  const now = new Date();
  const stamp = now.toLocaleDateString('tr-TR').replace(/\./g,'-')
  + '_' + String(now.getHours()).padStart(2,'0')
  + '-' + String(now.getMinutes()).padStart(2,'0');
- a.href = url;
- a.download = `konseltur-yedek-${stamp}.json`;
- a.click();
- URL.revokeObjectURL(url);
+ const filename = `konseltur-yedek-${stamp}.json`;
 
- try { localStorage.setItem('konseltur_last_backup', now.toISOString()); } catch(e){}
-
- const info = document.getElementById('backup-info');
- if(info) info.textContent = ' Yedek alındı: ' + now.toLocaleString('tr-TR')
- + ' (' + totalStudents + ' öğrenci, ' + totalDrivers + ' sürücü)';
- toast('ℹ️ Veri yedeklendi','success');
+ _saveBackupBlob(blob, filename).then(()=>{
+   try { localStorage.setItem('konseltur_last_backup', now.toISOString()); } catch(e){}
+   const info = document.getElementById('backup-info');
+   if(info) info.textContent = ' Yedek alındı: ' + now.toLocaleString('tr-TR')
+   + ' (' + totalStudents + ' öğrenci, ' + totalDrivers + ' sürücü, tüm modüller dahil)';
+   const loginInfo = document.getElementById('login-backup-info');
+   if(loginInfo) loginInfo.innerHTML = '<span style="color:var(--green);">Yedek alındı — '+now.toLocaleString('tr-TR')+' ('+totalStudents+' öğrenci, '+totalDrivers+' sürücü, tüm modüller dahil)</span>';
+   if(typeof playSuccessSound==='function'){ try{ playSuccessSound(); }catch(e){} }
+ });
 }
 
 function importData(event){
