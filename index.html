@@ -1552,7 +1552,7 @@ body.light .pay-row:hover { background:rgba(0,0,0,.025); }
 <!-- Firebase SDK -->
 <script type="module">
  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
- import { getDatabase, ref, set, get, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+ import { getDatabase, ref, set, get, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
  // ÖNEMLİ: Firebase Console → Realtime Database → Rules ayarlayın!
@@ -1573,6 +1573,7 @@ body.light .pay-row:hover { background:rgba(0,0,0,.025); }
  // Global erişim için window'a aktar
  window._fbRef    = ref;
  window._fbSet    = set;
+ window._fbUpdate = update;
  window._fbGet    = get;
  window._fbOnValue = onValue;
  window._fbRemove = remove;
@@ -1695,7 +1696,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.22-83</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-84</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -14917,6 +14918,25 @@ async function _saveCariToStorage(){
   await window._fbSet(dbRef, _cariData);
 }
 
+// HIZLI KAYIT: Sadece TEK BİR hareketi sunucuya gönderir — tüm Cari verisini değil.
+// "Yeni bir veri eklediğimde yavaş kaydediyor" şikayetinin çözümü budur: bir ay aktif
+// kullanımdan sonra Cari Hesaplar büyüdükçe, her küçük ekleme bile TÜM veriyi (yüzlerce
+// hesap + binlerce hareket) yeniden göndermek zorunda kalıyordu. Artık sadece değişen
+// tek hareket gönderiliyor — kayıt hızı artık veri büyüklüğünden bağımsız, her zaman hızlı.
+// hareketData=null verilirse o hareket silinir.
+async function _saveCariHareketOnly(cariId, hareketId, hareketData){
+  _lastCariSaveAt = Date.now();
+  try{ localStorage.setItem(_cariLsKey(), JSON.stringify(_cariData)); }catch(e){}
+  await _waitCariSync();
+  if(!window._fbDb || !window._fbRef || !window._fbUpdate){
+    throw new Error('Firebase hazır değil (internet bağlantısı veya oturum sorunu olabilir)');
+  }
+  const dbRef = window._fbRef(window._fbDb, 'konseltur/GLOBAL/cari/'+cariId+'/hareketler');
+  const updates = {};
+  updates[hareketId] = hareketData;
+  await window._fbUpdate(dbRef, updates);
+}
+
 function _newCariId(){ return 'c_' + Date.now() + '_' + Math.random().toString(36).substr(2,5); }
 function _newHareketId(){ return 'h_' + Date.now() + '_' + Math.random().toString(36).substr(2,5); }
 
@@ -15727,7 +15747,10 @@ async function saveCariHareket(){
     _cariData[id].hareketler[hid]._karsiHareketId = karsiHid;
   }
   try{
-    await _saveCariToStorage();
+    await _saveCariHareketOnly(id, hid, _cariData[id].hareketler[hid]);
+    if(karsiId && _karsiCari){
+      await _saveCariHareketOnly(karsiId, _cariData[id].hareketler[hid]._karsiHareketId, _karsiCari.hareketler[_cariData[id].hareketler[hid]._karsiHareketId]);
+    }
     document.getElementById('cari-hareket-modal').classList.remove('open');
     showToast('✅ '+(tip==='borc'?'Alınan':'Verilen')+' kaydedildi: '+_fmtPara(tutar),'success');
     renderCariDetay(id);
@@ -15748,7 +15771,7 @@ function deleteCariHareket(cariId,hareketId){
     if(_hObj) _trashAdd('hareket', hareketId, {..._hObj, _cariId: cariId});
     delete _cariData[cariId].hareketler[hareketId];
     try{
-      await _saveCariToStorage();
+      await _saveCariHareketOnly(cariId, hareketId, null);
       cm.style.display='none';
       showToast('✅ Hareket silindi ve sunucuya kaydedildi','success');
       renderCariDetay(cariId);
@@ -16567,6 +16590,7 @@ async function _echKaydet(){
     const yeniTarih = tarih || new Date().toISOString().split('T')[0];
     const aciklamaBaz = aciklama || (tip==='borc'?'Alındı':'Verildi');
     let _karsiGuncellendi = false;
+    window._echKarsiUpdated = null; // {cariId, hareketId} — targeted save için
 
     // 1. Referans varsa direkt güncelle
     const _refCariId = _eskiH._karsiCariId;
@@ -16581,6 +16605,7 @@ async function _echKaydet(){
         ts: Date.now() + 1
       });
       _karsiGuncellendi = true;
+      window._echKarsiUpdated = {cariId:_refCariId, hareketId:_refHid};
     }
 
     // 2. Referans yoksa — tüm carilerde eşleşen hareketi bul
@@ -16611,6 +16636,7 @@ async function _echKaydet(){
               ts: Date.now() + 1
             });
             _karsiGuncellendi = true;
+            window._echKarsiUpdated = {cariId:key, hareketId:khid};
           }
         });
       });
@@ -16620,7 +16646,12 @@ async function _echKaydet(){
   }
 
   try{
-    await _saveCariToStorage();
+    await _saveCariHareketOnly(cariId, hareketId, _cariData[cariId].hareketler[hareketId]);
+    if(window._echKarsiUpdated){
+      const ku = window._echKarsiUpdated;
+      await _saveCariHareketOnly(ku.cariId, ku.hareketId, _cariData[ku.cariId].hareketler[ku.hareketId]);
+      window._echKarsiUpdated = null;
+    }
     _echKapat();
     renderCariDetay(cariId);
     showToast('✅ Hareket güncellendi ve sunucuya kaydedildi','success');
