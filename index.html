@@ -1696,7 +1696,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-86</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-87</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -18236,7 +18236,14 @@ try{ _updateLoginBasvuruCount(); }catch(e){}
 var ARAC_KEY='konseltur_arac_takip_v1';
 function _loadAraclar(){try{return JSON.parse(localStorage.getItem(ARAC_KEY)||'[]');}catch(e){return[];}}
 function _saveAraclar(list){
-  localStorage.setItem(ARAC_KEY,JSON.stringify(list));
+  // ÖNEMLİ: localStorage'ın sınırlı bir kapasitesi var (genelde 5-10MB, tüm uygulama
+  // paylaşıyor). Ruhsat fotoğrafları eklendikten sonra bu sınıra ulaşılabiliyor —
+  // önceden bu durumda hata SESSİZCE fırlıyor ve fonksiyon burada duruyordu, Firebase'e
+  // hiç yazma denenmiyordu ("9 araçtan sonra yüklenmiyor" hatasının kök nedeni buydu).
+  // Artık yerel önbellek yazımı başarısız olsa bile, ASIL kayıt olan Firebase'e
+  // yazma denemesi HER ZAMAN yapılıyor (Firebase'in kapasitesi çok daha büyük, 1GB).
+  try{ localStorage.setItem(ARAC_KEY,JSON.stringify(list)); }
+  catch(e){ console.warn('Araç listesi yerel depoya sığmadı (Firebase\'e yine de yazılacak):', e); }
   if(window._fbDb&&window._fbSet&&window._fbRef){
     // Firebase'e object map olarak yaz (array index sorununu önle)
     var fbObj = {};
@@ -18387,7 +18394,8 @@ function openAracTakipModal(){
         // Array ise direkt kullan, object ise values al
         var list = Array.isArray(fbData) ? fbData : Object.values(fbData||{});
         if(list && list.length > 0){
-          localStorage.setItem(ARAC_KEY, JSON.stringify(list));
+          try{ localStorage.setItem(ARAC_KEY, JSON.stringify(list)); }
+          catch(e){ console.warn('Araç listesi yerel depoya sığmadı:', e); }
         }
       }
       _openAracTakipEkran();
@@ -18632,14 +18640,14 @@ function _atRuhsatSecildi(input){
   reader.onload = function(e){
     var img = new Image();
     img.onload = function(){
-      var maxW = 1000;
+      var maxW = 900;
       var scale = Math.min(1, maxW / img.width);
       var canvas = document.createElement('canvas');
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      var dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.55);
       document.getElementById('at-ruhsat-data').value = dataUrl;
       if(prevImg){ prevImg.src = dataUrl; }
       if(prevWrap){ prevWrap.style.display = 'block'; }
@@ -18683,7 +18691,20 @@ function _atSaveArac(){
   var obj={id:editId||Date.now().toString(36),plaka:plaka,tip:document.getElementById('at-tip').value.trim(),sigorta:document.getElementById('at-sigorta').value,muayene:document.getElementById('at-muayene').value,not:document.getElementById('at-not').value.trim(),ruhsatFoto:document.getElementById('at-ruhsat-data').value||null,guncelleme:new Date().toISOString()};
   if(editId){var i=list.findIndex(function(x){return x.id===editId;});if(i>=0)list[i]=obj;else list.push(obj);}
   else list.push(obj);
-  localStorage.setItem(ARAC_KEY, JSON.stringify(list));
+  // ÖNEMLİ DÜZELTME: localStorage'ın sınırlı bir kapasitesi var (tarayıcı başına
+  // genelde 5-10MB, TÜM uygulama bunu paylaşıyor). Ruhsat fotoğrafları eklendikçe bu
+  // liste büyüyor ve bir noktada (sizde 9. araçtan sonra) bu sınıra ulaşılıp
+  // localStorage.setItem() SESSİZCE hata fırlatıyordu — bu da fonksiyonun orada
+  // durmasına, Firebase'e hiç yazma denemesi yapılmamasına yol açıyordu (ekranda
+  // hiçbir şey olmuyormuş gibi görünüyordu). Artık bu hata yakalanıyor VE asıl kayıt
+  // olan Firebase'e yazma denemesi (çok daha büyük kapasitesi olduğu için) her
+  // durumda yapılıyor.
+  try{
+    localStorage.setItem(ARAC_KEY, JSON.stringify(list));
+  }catch(e){
+    console.warn('Araç listesi yerel depoya sığmadı (Firebase\'e yine de gönderiliyor):', e);
+    if(typeof toast==='function') toast('⚠️ Cihazın yerel deposu doldu ama sunucuya gönderiliyor...','info');
+  }
   _saveAracOnly(obj.id, obj).then(function(){
     if(typeof toast==='function')toast('✅ Araç kaydedildi ve sunucuya gönderildi','success');
   }).catch(function(e){
