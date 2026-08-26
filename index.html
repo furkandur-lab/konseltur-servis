@@ -1696,7 +1696,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-84</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-85</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -18440,6 +18440,15 @@ function _openAracTakipEkran(){
       +'</div>'
       +'<div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">NOT</div>'
       +'<input id="at-not" placeholder="Opsiyonel..." style="width:100%;padding:10px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>'
+      +'<div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;">RUHSAT FOTOĞRAFI</div>'
+      +'<input type="hidden" id="at-ruhsat-data">'
+      +'<div id="at-ruhsat-preview-wrap" style="display:none;margin-bottom:8px;position:relative;width:fit-content;">'
+        +'<img id="at-ruhsat-preview" style="max-width:220px;max-height:140px;border-radius:8px;border:1px solid rgba(255,255,255,.15);display:block;">'
+        +'<button type="button" onclick="_atRuhsatKaldir()" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;border:1px solid rgba(239,68,68,.4);background:#1a0505;color:#f87171;font-size:13px;cursor:pointer;">×</button>'
+      +'</div>'
+      +'<input type="file" id="at-ruhsat-file" accept="image/*" onchange="_atRuhsatSecildi(this)" style="font-size:12px;color:rgba(255,255,255,.5);">'
+      +'<div id="at-ruhsat-status" style="font-size:11px;color:rgba(255,255,255,.35);margin-top:4px;"></div>'
+      +'</div>'
       +'<div style="display:flex;gap:8px;">'
         +'<button id="at-kaydet" style="padding:10px 22px;border-radius:9px;border:none;background:#0ea5e9;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Kaydet</button>'
         +'<button id="at-iptal" style="padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.5);font-size:13px;font-weight:700;cursor:pointer;">İptal</button>'
@@ -18466,6 +18475,7 @@ function _openAracTakipEkran(){
     document.getElementById('at-edit-id').value='';
     ['at-plaka','at-tip','at-not'].forEach(function(id){document.getElementById(id).value='';});
     ['at-sigorta','at-muayene'].forEach(function(id){document.getElementById(id).value='';});
+    _atRuhsatKaldir();
     document.getElementById('at-form').style.display='block';
     document.getElementById('at-plaka').focus();
   });
@@ -18506,6 +18516,7 @@ function _atRenderListe(){
         +(a.tip?'<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:3px;">'+a.tip+'</div>':'')
         +(a.not?'<div style="font-size:11px;color:rgba(255,255,255,.25);margin-top:2px;font-style:italic;">'+a.not+'</div>':'')+'</div>'
         +'<div style="display:flex;gap:6px;">'
+          +(a.ruhsatFoto?'<button onclick="_atRuhsatGoster(\''+a.id+'\')" style="padding:6px 10px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);color:#a78bfa;font-size:11px;font-weight:700;cursor:pointer;">📄 Ruhsat</button>':'')
           +'<button onclick="_atEditArac(this)" data-id="'+a.id+'" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:11px;font-weight:700;cursor:pointer;">Düzenle</button>'
           +'<button onclick="_atDeleteArac(this)" data-id="'+a.id+'" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;">Sil</button>'
         +'</div>'
@@ -18524,6 +18535,21 @@ function _atRenderListe(){
   }).join('');
 }
 
+// Ruhsat fotoğrafını tam ekran gösterir
+function _atRuhsatGoster(aracId){
+  var a = _loadAraclar().find(function(x){ return x.id===aracId; });
+  if(!a || !a.ruhsatFoto) return;
+  var old = document.getElementById('at-ruhsat-viewer');
+  if(old) old.remove();
+  var wrap = document.createElement('div');
+  wrap.id = 'at-ruhsat-viewer';
+  wrap.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;cursor:zoom-out;';
+  wrap.onclick = function(){ wrap.remove(); };
+  wrap.innerHTML = '<img src="'+a.ruhsatFoto+'" style="max-width:95%;max-height:95%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6);">'
+    + '<button onclick="event.stopPropagation();this.parentElement.remove();" style="position:fixed;top:20px;right:20px;width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:20px;cursor:pointer;">×</button>';
+  document.body.appendChild(wrap);
+}
+
 // Düzenleme formunu, listenin içine taşınmışsa orijinal (üstteki) konumuna geri
 // getirir. _atRenderListe() her çağrıldığında #at-liste'nin İÇİNDEKİ HER ŞEYİ
 // (innerHTML ile) silip yeniden oluşturuyor — form o an listenin içinde kalmışsa
@@ -18540,19 +18566,77 @@ function _atRestoreFormPosition(){
   }
 }
 
+// Ruhsat fotoğrafını seçtiğinizde otomatik sıkıştırır (max 1000px genişlik, JPEG %65
+// kalite) — böylece veritabanında az yer kaplar ve kayıt hızlı kalır. Firebase Storage
+// (ayrı bir ücretli plan gerektirir) yerine mevcut (ücretsiz) veritabanına kaydediyoruz.
+function _atRuhsatSecildi(input){
+  var file = input.files && input.files[0];
+  if(!file) return;
+  var statusEl = document.getElementById('at-ruhsat-status');
+  if(statusEl) statusEl.textContent = '⏳ Sıkıştırılıyor...';
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var maxW = 1000;
+      var scale = Math.min(1, maxW / img.width);
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+      document.getElementById('at-ruhsat-data').value = dataUrl;
+      var prevImg = document.getElementById('at-ruhsat-preview');
+      var prevWrap = document.getElementById('at-ruhsat-preview-wrap');
+      if(prevImg){ prevImg.src = dataUrl; }
+      if(prevWrap){ prevWrap.style.display = 'block'; }
+      var kb = Math.round(dataUrl.length * 0.75 / 1024);
+      if(statusEl) statusEl.textContent = '✅ Hazır (~'+kb+' KB)';
+    };
+    img.onerror = function(){ if(statusEl) statusEl.textContent = '❌ Resim okunamadı'; };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function _atRuhsatKaldir(){
+  document.getElementById('at-ruhsat-data').value = '';
+  document.getElementById('at-ruhsat-preview-wrap').style.display = 'none';
+  document.getElementById('at-ruhsat-file').value = '';
+  var statusEl = document.getElementById('at-ruhsat-status');
+  if(statusEl) statusEl.textContent = '';
+}
+
+// TEK ARAÇ İÇİN HIZLI KAYIT: Ruhsat fotoğrafı eklendiğinde kayıtlar büyüyebilir —
+// bu yüzden Cari Hesaplar'da yaptığımız gibi, sadece DEĞİŞEN aracı gönderiyoruz,
+// listenin tamamını değil. Böylece bir aracın ruhsatını güncellemek diğer tüm
+// araçların verisini yeniden göndermeyi gerektirmiyor.
+async function _saveAracOnly(aracId, aracData){
+  if(!window._fbDb || !window._fbRef || !window._fbUpdate) return;
+  var dbRef = window._fbRef(window._fbDb, 'konseltur/GLOBAL/arac_takip');
+  var updates = {};
+  updates[aracId] = aracData;
+  await window._fbUpdate(dbRef, updates);
+}
+
 function _atSaveArac(){
   var plaka=(document.getElementById('at-plaka').value||'').trim().toUpperCase();
   if(!plaka){if(typeof toast==='function')toast('Plaka zorunludur','error');return;}
   var editId=document.getElementById('at-edit-id').value;
   var list=_loadAraclar();
-  var obj={id:editId||Date.now().toString(36),plaka:plaka,tip:document.getElementById('at-tip').value.trim(),sigorta:document.getElementById('at-sigorta').value,muayene:document.getElementById('at-muayene').value,not:document.getElementById('at-not').value.trim(),guncelleme:new Date().toISOString()};
+  var obj={id:editId||Date.now().toString(36),plaka:plaka,tip:document.getElementById('at-tip').value.trim(),sigorta:document.getElementById('at-sigorta').value,muayene:document.getElementById('at-muayene').value,not:document.getElementById('at-not').value.trim(),ruhsatFoto:document.getElementById('at-ruhsat-data').value||null,guncelleme:new Date().toISOString()};
   if(editId){var i=list.findIndex(function(x){return x.id===editId;});if(i>=0)list[i]=obj;else list.push(obj);}
   else list.push(obj);
-  _saveAraclar(list);
+  localStorage.setItem(ARAC_KEY, JSON.stringify(list));
+  _saveAracOnly(obj.id, obj).then(function(){
+    if(typeof toast==='function')toast('✅ Araç kaydedildi ve sunucuya gönderildi','success');
+  }).catch(function(e){
+    console.error('Araç kaydedilemedi:', e);
+    if(typeof toast==='function')toast('❌ SUNUCUYA KAYDEDİLEMEDİ: '+(e.message||'bilinmeyen hata'),'error');
+  });
   document.getElementById('at-form').style.display='none';
   _atRestoreFormPosition();  // ÖNEMLİ: listeyi yeniden çizmeden önce formu güvenli yere taşı
   _atRenderListe();
-  if(typeof toast==='function')toast('Araç kaydedildi ✓','success');
 }
 
 function _atEditArac(btn){var id=btn.getAttribute('data-id');
@@ -18564,6 +18648,18 @@ function _atEditArac(btn){var id=btn.getAttribute('data-id');
   document.getElementById('at-sigorta').value=a.sigorta||'';
   document.getElementById('at-muayene').value=a.muayene||'';
   document.getElementById('at-not').value=a.not||'';
+  document.getElementById('at-ruhsat-file').value='';
+  document.getElementById('at-ruhsat-data').value=a.ruhsatFoto||'';
+  var prevWrap=document.getElementById('at-ruhsat-preview-wrap');
+  var statusEl=document.getElementById('at-ruhsat-status');
+  if(a.ruhsatFoto){
+    document.getElementById('at-ruhsat-preview').src=a.ruhsatFoto;
+    prevWrap.style.display='block';
+    if(statusEl) statusEl.textContent='';
+  } else {
+    prevWrap.style.display='none';
+    if(statusEl) statusEl.textContent='';
+  }
   var form=document.getElementById('at-form');
   // Formu sayfanın en üstünde sabit tutmak yerine, tıklanan aracın KARTININ HEMEN
   // ALTINA taşıyoruz — "düzenle dediğimde en üste sıçrıyor" hatasının çözümü budur.
