@@ -1696,7 +1696,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-85</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-86</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -18446,7 +18446,7 @@ function _openAracTakipEkran(){
         +'<img id="at-ruhsat-preview" style="max-width:220px;max-height:140px;border-radius:8px;border:1px solid rgba(255,255,255,.15);display:block;">'
         +'<button type="button" onclick="_atRuhsatKaldir()" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;border:1px solid rgba(239,68,68,.4);background:#1a0505;color:#f87171;font-size:13px;cursor:pointer;">×</button>'
       +'</div>'
-      +'<input type="file" id="at-ruhsat-file" accept="image/*" onchange="_atRuhsatSecildi(this)" style="font-size:12px;color:rgba(255,255,255,.5);">'
+      +'<input type="file" id="at-ruhsat-file" accept="image/*,application/pdf" onchange="_atRuhsatSecildi(this)" style="font-size:12px;color:rgba(255,255,255,.5);">'
       +'<div id="at-ruhsat-status" style="font-size:11px;color:rgba(255,255,255,.35);margin-top:4px;"></div>'
       +'</div>'
       +'<div style="display:flex;gap:8px;">'
@@ -18539,6 +18539,24 @@ function _atRenderListe(){
 function _atRuhsatGoster(aracId){
   var a = _loadAraclar().find(function(x){ return x.id===aracId; });
   if(!a || !a.ruhsatFoto) return;
+  if(a.ruhsatFoto.indexOf('data:application/pdf')===0){
+    // PDF'ler <img> ile gösterilemez — tarayıcının kendi PDF görüntüleyicisinde
+    // yeni sekmede açılıyor. Uzun data: URL'ler bazı tarayıcılarda sorun
+    // çıkarabildiği için, önce gerçek bir Blob adresine çevriliyor.
+    try{
+      var parts = a.ruhsatFoto.split(',');
+      var byteStr = atob(parts[1]);
+      var bytes = new Uint8Array(byteStr.length);
+      for(var i=0;i<byteStr.length;i++){ bytes[i] = byteStr.charCodeAt(i); }
+      var blob = new Blob([bytes], {type:'application/pdf'});
+      var url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    }catch(e){
+      console.error('PDF açılamadı:', e);
+      if(typeof toast==='function') toast('❌ PDF açılamadı','error');
+    }
+    return;
+  }
   var old = document.getElementById('at-ruhsat-viewer');
   if(old) old.remove();
   var wrap = document.createElement('div');
@@ -18573,6 +18591,42 @@ function _atRuhsatSecildi(input){
   var file = input.files && input.files[0];
   if(!file) return;
   var statusEl = document.getElementById('at-ruhsat-status');
+  var prevWrap = document.getElementById('at-ruhsat-preview-wrap');
+  var prevImg = document.getElementById('at-ruhsat-preview');
+
+  if(file.type === 'application/pdf'){
+    // PDF'ler canvas ile sıkıştırılamaz (resim değil) — doğrudan okunuyor.
+    // Realtime Database'de çok büyük dosyalar önerilmediği için 4MB üzeri
+    // dosyalarda uyarı gösteriliyor (yine de yükleyebilirsiniz, ama önerilmez).
+    var mb = file.size / (1024*1024);
+    if(statusEl) statusEl.textContent = '⏳ PDF okunuyor...';
+    var reader = new FileReader();
+    reader.onload = function(e){
+      document.getElementById('at-ruhsat-data').value = e.target.result;
+      if(prevImg) prevImg.style.display = 'none';
+      var pdfBadge = document.getElementById('at-ruhsat-pdf-badge');
+      if(!pdfBadge){
+        pdfBadge = document.createElement('div');
+        pdfBadge.id = 'at-ruhsat-pdf-badge';
+        pdfBadge.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:8px;color:#a78bfa;font-size:12px;font-weight:700;max-width:220px;';
+        prevWrap.insertBefore(pdfBadge, prevImg);
+      }
+      pdfBadge.style.display = 'flex';
+      pdfBadge.textContent = '📄 ' + file.name;
+      if(prevWrap) prevWrap.style.display = 'block';
+      if(statusEl) statusEl.textContent = mb > 4
+        ? '⚠️ Hazır ama dosya büyük (~'+mb.toFixed(1)+' MB) — mümkünse daha küçük bir PDF tercih edin'
+        : '✅ Hazır (~'+Math.round(mb*1024)+' KB)';
+    };
+    reader.onerror = function(){ if(statusEl) statusEl.textContent = '❌ PDF okunamadı'; };
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  // Resimler: önceki gibi otomatik sıkıştırma (max 1000px genişlik, JPEG %65 kalite)
+  var pdfBadge2 = document.getElementById('at-ruhsat-pdf-badge');
+  if(pdfBadge2) pdfBadge2.style.display = 'none';
+  if(prevImg) prevImg.style.display = 'block';
   if(statusEl) statusEl.textContent = '⏳ Sıkıştırılıyor...';
   var reader = new FileReader();
   reader.onload = function(e){
@@ -18587,8 +18641,6 @@ function _atRuhsatSecildi(input){
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       var dataUrl = canvas.toDataURL('image/jpeg', 0.65);
       document.getElementById('at-ruhsat-data').value = dataUrl;
-      var prevImg = document.getElementById('at-ruhsat-preview');
-      var prevWrap = document.getElementById('at-ruhsat-preview-wrap');
       if(prevImg){ prevImg.src = dataUrl; }
       if(prevWrap){ prevWrap.style.display = 'block'; }
       var kb = Math.round(dataUrl.length * 0.75 / 1024);
@@ -18603,6 +18655,10 @@ function _atRuhsatKaldir(){
   document.getElementById('at-ruhsat-data').value = '';
   document.getElementById('at-ruhsat-preview-wrap').style.display = 'none';
   document.getElementById('at-ruhsat-file').value = '';
+  var pdfBadge = document.getElementById('at-ruhsat-pdf-badge');
+  if(pdfBadge) pdfBadge.style.display = 'none';
+  var prevImg = document.getElementById('at-ruhsat-preview');
+  if(prevImg) prevImg.style.display = 'block';
   var statusEl = document.getElementById('at-ruhsat-status');
   if(statusEl) statusEl.textContent = '';
 }
@@ -18651,12 +18707,30 @@ function _atEditArac(btn){var id=btn.getAttribute('data-id');
   document.getElementById('at-ruhsat-file').value='';
   document.getElementById('at-ruhsat-data').value=a.ruhsatFoto||'';
   var prevWrap=document.getElementById('at-ruhsat-preview-wrap');
+  var prevImg=document.getElementById('at-ruhsat-preview');
+  var pdfBadge=document.getElementById('at-ruhsat-pdf-badge');
   var statusEl=document.getElementById('at-ruhsat-status');
-  if(a.ruhsatFoto){
-    document.getElementById('at-ruhsat-preview').src=a.ruhsatFoto;
+  var isPdf = a.ruhsatFoto && a.ruhsatFoto.indexOf('data:application/pdf')===0;
+  if(a.ruhsatFoto && isPdf){
+    if(prevImg) prevImg.style.display='none';
+    if(!pdfBadge){
+      pdfBadge = document.createElement('div');
+      pdfBadge.id = 'at-ruhsat-pdf-badge';
+      pdfBadge.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:8px;color:#a78bfa;font-size:12px;font-weight:700;max-width:220px;';
+      prevWrap.insertBefore(pdfBadge, prevImg);
+    }
+    pdfBadge.style.display='flex';
+    pdfBadge.textContent='📄 Ruhsat (PDF)';
+    prevWrap.style.display='block';
+    if(statusEl) statusEl.textContent='';
+  } else if(a.ruhsatFoto){
+    if(pdfBadge) pdfBadge.style.display='none';
+    if(prevImg){ prevImg.style.display='block'; prevImg.src=a.ruhsatFoto; }
     prevWrap.style.display='block';
     if(statusEl) statusEl.textContent='';
   } else {
+    if(pdfBadge) pdfBadge.style.display='none';
+    if(prevImg) prevImg.style.display='block';
     prevWrap.style.display='none';
     if(statusEl) statusEl.textContent='';
   }
