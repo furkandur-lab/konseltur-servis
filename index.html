@@ -1696,7 +1696,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-87</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-88</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -18452,7 +18452,7 @@ function _openAracTakipEkran(){
       +'<input type="hidden" id="at-ruhsat-data">'
       +'<div id="at-ruhsat-preview-wrap" style="display:none;margin-bottom:8px;position:relative;width:fit-content;">'
         +'<img id="at-ruhsat-preview" style="max-width:220px;max-height:140px;border-radius:8px;border:1px solid rgba(255,255,255,.15);display:block;">'
-        +'<button type="button" onclick="_atRuhsatKaldir()" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;border:1px solid rgba(239,68,68,.4);background:#1a0505;color:#f87171;font-size:13px;cursor:pointer;">×</button>'
+        +'<button type="button" onclick="window._atRuhsatDegisti=true;_atRuhsatKaldir();" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;border:1px solid rgba(239,68,68,.4);background:#1a0505;color:#f87171;font-size:13px;cursor:pointer;">×</button>'
       +'</div>'
       +'<input type="file" id="at-ruhsat-file" accept="image/*,application/pdf" onchange="_atRuhsatSecildi(this)" style="font-size:12px;color:rgba(255,255,255,.5);">'
       +'<div id="at-ruhsat-status" style="font-size:11px;color:rgba(255,255,255,.35);margin-top:4px;"></div>'
@@ -18479,6 +18479,7 @@ function _openAracTakipEkran(){
   document.getElementById('at-geri').addEventListener('click',function(){ document.body.removeChild(scr); _updateAracTakipOzet(); });
   document.getElementById('at-ekle-btn').addEventListener('click',function(){
     _atRestoreFormPosition();
+    window._atRuhsatDegisti = false;
     document.getElementById('at-form-title').textContent='Yeni Araç Ekle';
     document.getElementById('at-edit-id').value='';
     ['at-plaka','at-tip','at-not'].forEach(function(id){document.getElementById(id).value='';});
@@ -18510,6 +18511,24 @@ function _atRenderListe(){
   if(typeof _atRestoreFormPosition==='function') _atRestoreFormPosition();
   var el=document.getElementById('at-liste'); if(!el)return;
   var list=_loadAraclar();
+  // TEK SEFERLİK GEÇİŞ: Bu düzeltmeden önce eklenen ruhsatlar ana kayda gömülüydü
+  // (a.ruhsatFoto). Bunları kaybetmemek için, fark edildiğinde otomatik olarak yeni,
+  // ayrı yoluna taşıyoruz ve ana kayıttan bu ağır alanı temizliyoruz.
+  var _migrateNeeded = list.some(function(a){ return a.ruhsatFoto; });
+  if(_migrateNeeded){
+    list.forEach(function(a){
+      if(a.ruhsatFoto){
+        var _foto = a.ruhsatFoto;
+        a.hasRuhsat = true;
+        a.ruhsatType = _foto.indexOf('data:application/pdf')===0 ? 'pdf' : 'image';
+        delete a.ruhsatFoto;
+        _saveRuhsatOnly(a.id, _foto).catch(function(e){ console.warn('Ruhsat geçişi başarısız:', a.plaka, e); });
+        _saveAracOnly(a.id, a).catch(function(e){ console.warn('Araç kaydı güncellenemedi (geçiş):', a.plaka, e); });
+      }
+    });
+    try{ localStorage.setItem(ARAC_KEY, JSON.stringify(list)); }catch(e){}
+    if(typeof toast==='function') toast('🔄 Mevcut ruhsatlar yeni, daha hızlı sisteme taşınıyor...','info');
+  }
   if(!list.length){el.innerHTML='<div style="color:rgba(255,255,255,.3);text-align:center;padding:60px 0;font-size:13px;">Henüz araç eklenmedi.<br><br>+ Araç Ekle butonuna tıklayın.</div>';return;}
   list.sort(function(a,b){
     function mn(x){var v=[x.sigorta,x.muayene].map(_gunFark).filter(function(v){return v!==null;});return v.length?Math.min.apply(null,v):9999;}
@@ -18524,7 +18543,7 @@ function _atRenderListe(){
         +(a.tip?'<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:3px;">'+a.tip+'</div>':'')
         +(a.not?'<div style="font-size:11px;color:rgba(255,255,255,.25);margin-top:2px;font-style:italic;">'+a.not+'</div>':'')+'</div>'
         +'<div style="display:flex;gap:6px;">'
-          +(a.ruhsatFoto?'<button onclick="_atRuhsatGoster(\''+a.id+'\')" style="padding:6px 10px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);color:#a78bfa;font-size:11px;font-weight:700;cursor:pointer;">📄 Ruhsat</button>':'')
+          +(a.hasRuhsat?'<button onclick="_atRuhsatGoster(\''+a.id+'\')" style="padding:6px 10px;border-radius:7px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);color:#a78bfa;font-size:11px;font-weight:700;cursor:pointer;">📄 Ruhsat</button>':'')
           +'<button onclick="_atEditArac(this)" data-id="'+a.id+'" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:11px;font-weight:700;cursor:pointer;">Düzenle</button>'
           +'<button onclick="_atDeleteArac(this)" data-id="'+a.id+'" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;">Sil</button>'
         +'</div>'
@@ -18545,35 +18564,43 @@ function _atRenderListe(){
 
 // Ruhsat fotoğrafını tam ekran gösterir
 function _atRuhsatGoster(aracId){
-  var a = _loadAraclar().find(function(x){ return x.id===aracId; });
-  if(!a || !a.ruhsatFoto) return;
-  if(a.ruhsatFoto.indexOf('data:application/pdf')===0){
-    // PDF'ler <img> ile gösterilemez — tarayıcının kendi PDF görüntüleyicisinde
-    // yeni sekmede açılıyor. Uzun data: URL'ler bazı tarayıcılarda sorun
-    // çıkarabildiği için, önce gerçek bir Blob adresine çevriliyor.
-    try{
-      var parts = a.ruhsatFoto.split(',');
-      var byteStr = atob(parts[1]);
-      var bytes = new Uint8Array(byteStr.length);
-      for(var i=0;i<byteStr.length;i++){ bytes[i] = byteStr.charCodeAt(i); }
-      var blob = new Blob([bytes], {type:'application/pdf'});
-      var url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    }catch(e){
-      console.error('PDF açılamadı:', e);
-      if(typeof toast==='function') toast('❌ PDF açılamadı','error');
+  if(typeof toast==='function') toast('⏳ Ruhsat indiriliyor...','info');
+  _fetchRuhsat(aracId).then(function(ruhsatFoto){
+    if(!ruhsatFoto){
+      if(typeof toast==='function') toast('⚠️ Bu araç için kayıtlı ruhsat bulunamadı','error');
+      return;
     }
-    return;
-  }
-  var old = document.getElementById('at-ruhsat-viewer');
-  if(old) old.remove();
-  var wrap = document.createElement('div');
-  wrap.id = 'at-ruhsat-viewer';
-  wrap.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;cursor:zoom-out;';
-  wrap.onclick = function(){ wrap.remove(); };
-  wrap.innerHTML = '<img src="'+a.ruhsatFoto+'" style="max-width:95%;max-height:95%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6);">'
-    + '<button onclick="event.stopPropagation();this.parentElement.remove();" style="position:fixed;top:20px;right:20px;width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:20px;cursor:pointer;">×</button>';
-  document.body.appendChild(wrap);
+    if(ruhsatFoto.indexOf('data:application/pdf')===0){
+      // PDF'ler <img> ile gösterilemez — tarayıcının kendi PDF görüntüleyicisinde
+      // yeni sekmede açılıyor. Uzun data: URL'ler bazı tarayıcılarda sorun
+      // çıkarabildiği için, önce gerçek bir Blob adresine çevriliyor.
+      try{
+        var parts = ruhsatFoto.split(',');
+        var byteStr = atob(parts[1]);
+        var bytes = new Uint8Array(byteStr.length);
+        for(var i=0;i<byteStr.length;i++){ bytes[i] = byteStr.charCodeAt(i); }
+        var blob = new Blob([bytes], {type:'application/pdf'});
+        var url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      }catch(e){
+        console.error('PDF açılamadı:', e);
+        if(typeof toast==='function') toast('❌ PDF açılamadı','error');
+      }
+      return;
+    }
+    var old = document.getElementById('at-ruhsat-viewer');
+    if(old) old.remove();
+    var wrap = document.createElement('div');
+    wrap.id = 'at-ruhsat-viewer';
+    wrap.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;cursor:zoom-out;';
+    wrap.onclick = function(){ wrap.remove(); };
+    wrap.innerHTML = '<img src="'+ruhsatFoto+'" style="max-width:95%;max-height:95%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6);">'
+      + '<button onclick="event.stopPropagation();this.parentElement.remove();" style="position:fixed;top:20px;right:20px;width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:20px;cursor:pointer;">×</button>';
+    document.body.appendChild(wrap);
+  }).catch(function(e){
+    console.error('Ruhsat indirilemedi:', e);
+    if(typeof toast==='function') toast('❌ Ruhsat indirilemedi: '+(e.message||'bilinmeyen hata'),'error');
+  });
 }
 
 // Düzenleme formunu, listenin içine taşınmışsa orijinal (üstteki) konumuna geri
@@ -18598,6 +18625,7 @@ function _atRestoreFormPosition(){
 function _atRuhsatSecildi(input){
   var file = input.files && input.files[0];
   if(!file) return;
+  window._atRuhsatDegisti = true;
   var statusEl = document.getElementById('at-ruhsat-status');
   var prevWrap = document.getElementById('at-ruhsat-preview-wrap');
   var prevImg = document.getElementById('at-ruhsat-preview');
@@ -18671,10 +18699,8 @@ function _atRuhsatKaldir(){
   if(statusEl) statusEl.textContent = '';
 }
 
-// TEK ARAÇ İÇİN HIZLI KAYIT: Ruhsat fotoğrafı eklendiğinde kayıtlar büyüyebilir —
-// bu yüzden Cari Hesaplar'da yaptığımız gibi, sadece DEĞİŞEN aracı gönderiyoruz,
-// listenin tamamını değil. Böylece bir aracın ruhsatını güncellemek diğer tüm
-// araçların verisini yeniden göndermeyi gerektirmiyor.
+// TEK ARAÇ İÇİN HIZLI KAYIT: sadece DEĞİŞEN aracın (ruhsat HARİÇ) hafif bilgilerini
+// gönderiyoruz — listenin tamamını değil.
 async function _saveAracOnly(aracId, aracData){
   if(!window._fbDb || !window._fbRef || !window._fbUpdate) return;
   var dbRef = window._fbRef(window._fbDb, 'konseltur/GLOBAL/arac_takip');
@@ -18683,30 +18709,62 @@ async function _saveAracOnly(aracId, aracData){
   await window._fbUpdate(dbRef, updates);
 }
 
+// RUHSAT — AYRI BİR YOLDA SAKLANIR: Ruhsat fotoğrafları/PDF'leri, araç listesinden
+// TAMAMEN AYRI bir Firebase yoluna (konseltur/GLOBAL/arac_ruhsat) kaydediliyor.
+// ÖNEMLİ SEBEP: Araç Takip her açıldığında TÜM araç listesi indiriliyor — ruhsatlar
+// bu listenin İÇİNDE olsaydı, birkaç ruhsat eklendikten sonra bu indirme MB'larca
+// veri taşımak zorunda kalır, hem açılış yavaşlar (bildirdiğiniz "2-3 saniye gecikme")
+// hem de zayıf/mobil bağlantılarda indirme başarısız/eksik kalabilirdi (bildirdiğiniz
+// "mobilde görünmüyor" sorununun kök nedeni de büyük ihtimalle buydu). Artık liste
+// her zaman hafif kalıyor, ruhsat sadece siz "📄 Ruhsat" butonuna bastığınızda o anda
+// ayrıca indiriliyor.
+async function _saveRuhsatOnly(aracId, ruhsatData){
+  if(!window._fbDb || !window._fbRef || !window._fbSet) throw new Error('Firebase hazır değil');
+  var dbRef = window._fbRef(window._fbDb, 'konseltur/GLOBAL/arac_ruhsat/'+aracId);
+  if(ruhsatData){
+    await window._fbSet(dbRef, {data: ruhsatData, guncelleme: new Date().toISOString()});
+  } else {
+    await window._fbSet(dbRef, null); // ruhsat kaldırıldıysa sil
+  }
+}
+async function _fetchRuhsat(aracId){
+  if(!window._fbDb || !window._fbRef || !window._fbGet) return null;
+  var snap = await window._fbGet(window._fbRef(window._fbDb, 'konseltur/GLOBAL/arac_ruhsat/'+aracId));
+  if(snap && snap.exists()){
+    var v = snap.val();
+    return v ? v.data : null;
+  }
+  return null;
+}
+
 function _atSaveArac(){
   var plaka=(document.getElementById('at-plaka').value||'').trim().toUpperCase();
   if(!plaka){if(typeof toast==='function')toast('Plaka zorunludur','error');return;}
   var editId=document.getElementById('at-edit-id').value;
   var list=_loadAraclar();
-  var obj={id:editId||Date.now().toString(36),plaka:plaka,tip:document.getElementById('at-tip').value.trim(),sigorta:document.getElementById('at-sigorta').value,muayene:document.getElementById('at-muayene').value,not:document.getElementById('at-not').value.trim(),ruhsatFoto:document.getElementById('at-ruhsat-data').value||null,guncelleme:new Date().toISOString()};
+  var ruhsatData = document.getElementById('at-ruhsat-data').value || '';
+  var ruhsatType = ruhsatData.indexOf('data:application/pdf')===0 ? 'pdf' : (ruhsatData ? 'image' : null);
+  // ÖNEMLİ: ruhsatFoto artık bu ana kayda GÖMÜLMÜYOR — ayrı bir yola kaydediliyor
+  // (bkz. _saveRuhsatOnly). Ana kayıtta sadece "var mı yok mu" (hasRuhsat) bilgisi
+  // tutuluyor — bu sayede araç listesi her zaman hafif/hızlı kalıyor.
+  var obj={id:editId||Date.now().toString(36),plaka:plaka,tip:document.getElementById('at-tip').value.trim(),sigorta:document.getElementById('at-sigorta').value,muayene:document.getElementById('at-muayene').value,not:document.getElementById('at-not').value.trim(),hasRuhsat:!!ruhsatData,ruhsatType:ruhsatType,guncelleme:new Date().toISOString()};
   if(editId){var i=list.findIndex(function(x){return x.id===editId;});if(i>=0)list[i]=obj;else list.push(obj);}
   else list.push(obj);
-  // ÖNEMLİ DÜZELTME: localStorage'ın sınırlı bir kapasitesi var (tarayıcı başına
-  // genelde 5-10MB, TÜM uygulama bunu paylaşıyor). Ruhsat fotoğrafları eklendikçe bu
-  // liste büyüyor ve bir noktada (sizde 9. araçtan sonra) bu sınıra ulaşılıp
-  // localStorage.setItem() SESSİZCE hata fırlatıyordu — bu da fonksiyonun orada
-  // durmasına, Firebase'e hiç yazma denemesi yapılmamasına yol açıyordu (ekranda
-  // hiçbir şey olmuyormuş gibi görünüyordu). Artık bu hata yakalanıyor VE asıl kayıt
-  // olan Firebase'e yazma denemesi (çok daha büyük kapasitesi olduğu için) her
-  // durumda yapılıyor.
+  // Liste artık fotoğraf içermediği için localStorage kapasitesi sorun olmaz, ama
+  // yine de güvenlik için try/catch ile sarmalı bırakıyoruz.
   try{
     localStorage.setItem(ARAC_KEY, JSON.stringify(list));
   }catch(e){
     console.warn('Araç listesi yerel depoya sığmadı (Firebase\'e yine de gönderiliyor):', e);
-    if(typeof toast==='function') toast('⚠️ Cihazın yerel deposu doldu ama sunucuya gönderiliyor...','info');
   }
-  _saveAracOnly(obj.id, obj).then(function(){
+  var _saves = [_saveAracOnly(obj.id, obj)];
+  // Ruhsat verisi bu oturumda değiştiyse (yeni yüklendi veya kaldırıldı) ayrıca kaydet
+  if(window._atRuhsatDegisti){
+    _saves.push(_saveRuhsatOnly(obj.id, ruhsatData||null));
+  }
+  Promise.all(_saves).then(function(){
     if(typeof toast==='function')toast('✅ Araç kaydedildi ve sunucuya gönderildi','success');
+    window._atRuhsatDegisti = false;
   }).catch(function(e){
     console.error('Araç kaydedilemedi:', e);
     if(typeof toast==='function')toast('❌ SUNUCUYA KAYDEDİLEMEDİ: '+(e.message||'bilinmeyen hata'),'error');
@@ -18718,6 +18776,7 @@ function _atSaveArac(){
 
 function _atEditArac(btn){var id=btn.getAttribute('data-id');
   var a=_loadAraclar().find(function(x){return x.id===id;});if(!a)return;
+  window._atRuhsatDegisti = false;
   document.getElementById('at-form-title').textContent='Araç Düzenle';
   document.getElementById('at-edit-id').value=id;
   document.getElementById('at-plaka').value=a.plaka||'';
@@ -18726,33 +18785,43 @@ function _atEditArac(btn){var id=btn.getAttribute('data-id');
   document.getElementById('at-muayene').value=a.muayene||'';
   document.getElementById('at-not').value=a.not||'';
   document.getElementById('at-ruhsat-file').value='';
-  document.getElementById('at-ruhsat-data').value=a.ruhsatFoto||'';
+  document.getElementById('at-ruhsat-data').value='';
   var prevWrap=document.getElementById('at-ruhsat-preview-wrap');
   var prevImg=document.getElementById('at-ruhsat-preview');
   var pdfBadge=document.getElementById('at-ruhsat-pdf-badge');
   var statusEl=document.getElementById('at-ruhsat-status');
-  var isPdf = a.ruhsatFoto && a.ruhsatFoto.indexOf('data:application/pdf')===0;
-  if(a.ruhsatFoto && isPdf){
-    if(prevImg) prevImg.style.display='none';
-    if(!pdfBadge){
-      pdfBadge = document.createElement('div');
-      pdfBadge.id = 'at-ruhsat-pdf-badge';
-      pdfBadge.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:8px;color:#a78bfa;font-size:12px;font-weight:700;max-width:220px;';
-      prevWrap.insertBefore(pdfBadge, prevImg);
-    }
-    pdfBadge.style.display='flex';
-    pdfBadge.textContent='📄 Ruhsat (PDF)';
-    prevWrap.style.display='block';
-    if(statusEl) statusEl.textContent='';
-  } else if(a.ruhsatFoto){
-    if(pdfBadge) pdfBadge.style.display='none';
-    if(prevImg){ prevImg.style.display='block'; prevImg.src=a.ruhsatFoto; }
-    prevWrap.style.display='block';
-    if(statusEl) statusEl.textContent='';
+  if(pdfBadge) pdfBadge.style.display='none';
+  if(prevImg) prevImg.style.display='block';
+  prevWrap.style.display='none';
+  if(a.hasRuhsat){
+    // Ruhsat ayrı bir yolda saklandığı için, düzenleme açılırken SADECE o an
+    // ihtiyaç olduğunda (görüntülemek için) sunucudan çekiliyor — ana liste
+    // açılışını yavaşlatmaz.
+    if(statusEl) statusEl.textContent='⏳ Ruhsat yükleniyor...';
+    _fetchRuhsat(id).then(function(data){
+      if(!data){ if(statusEl) statusEl.textContent='⚠️ Ruhsat bulunamadı'; return; }
+      document.getElementById('at-ruhsat-data').value = data;
+      var isPdf = data.indexOf('data:application/pdf')===0;
+      if(isPdf){
+        if(prevImg) prevImg.style.display='none';
+        if(!pdfBadge){
+          pdfBadge = document.createElement('div');
+          pdfBadge.id = 'at-ruhsat-pdf-badge';
+          pdfBadge.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);border-radius:8px;color:#a78bfa;font-size:12px;font-weight:700;max-width:220px;';
+          prevWrap.insertBefore(pdfBadge, prevImg);
+        }
+        pdfBadge.style.display='flex';
+        pdfBadge.textContent='📄 Ruhsat (PDF)';
+      } else {
+        if(prevImg){ prevImg.style.display='block'; prevImg.src=data; }
+      }
+      prevWrap.style.display='block';
+      if(statusEl) statusEl.textContent='';
+    }).catch(function(e){
+      console.error('Ruhsat yüklenemedi:', e);
+      if(statusEl) statusEl.textContent='❌ Ruhsat yüklenemedi';
+    });
   } else {
-    if(pdfBadge) pdfBadge.style.display='none';
-    if(prevImg) prevImg.style.display='block';
-    prevWrap.style.display='none';
     if(statusEl) statusEl.textContent='';
   }
   var form=document.getElementById('at-form');
@@ -18772,6 +18841,9 @@ function _atDeleteArac(btn){var id=btn.getAttribute('data-id');
   var _aracObj=_loadAraclar().find(function(x){return x.id===id;});
   if(_aracObj) _trashAdd('arac', id, {..._aracObj, _deletedFrom:'arac_takip'});
   _saveAraclar(_loadAraclar().filter(function(x){return x.id!==id;}));
+  if(_aracObj && _aracObj.hasRuhsat){
+    _saveRuhsatOnly(id, null).catch(function(e){ console.warn('Ruhsat kaydı silinemedi:', e); });
+  }
   _atRenderListe();
   if(typeof toast==='function')toast('Araç silindi','success');
 }
