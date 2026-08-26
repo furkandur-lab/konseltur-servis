@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="202607101200">
+<meta name="app-version" content="v2026.08.26-89">
 <meta name="color-scheme" content="dark">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
@@ -1696,7 +1696,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.07.23-88</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.08.26-89</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -18564,9 +18564,17 @@ function _atRenderListe(){
 
 // Ruhsat fotoğrafını tam ekran gösterir
 function _atRuhsatGoster(aracId){
+  // ÖNEMLİ (iOS Safari düzeltmesi): window.open(), tıklamadan SONRA (bir "await"in
+  // ardından) çağrılırsa Safari bunu "kullanıcı eylemiyle bağlantısız" sayıp
+  // SESSİZCE engelliyor — hiçbir hata/uyarı vermeden hiçbir şey açılmıyordu.
+  // Çözüm: boş sekmeyi tıklamanın TAM O ANINDA (senkron) açıyoruz, içeriğini
+  // (PDF blob adresi) indirme bittiğinde dolduruyoruz. Böylece Safari bunu
+  // meşru bir kullanıcı eylemi olarak tanıyor ve engellemiyor.
+  var _preOpenedTab = window.open('', '_blank');
   if(typeof toast==='function') toast('⏳ Ruhsat indiriliyor...','info');
   _fetchRuhsat(aracId).then(function(ruhsatFoto){
     if(!ruhsatFoto){
+      if(_preOpenedTab && !_preOpenedTab.closed) _preOpenedTab.close();
       if(typeof toast==='function') toast('⚠️ Bu araç için kayıtlı ruhsat bulunamadı','error');
       return;
     }
@@ -18581,13 +18589,21 @@ function _atRuhsatGoster(aracId){
         for(var i=0;i<byteStr.length;i++){ bytes[i] = byteStr.charCodeAt(i); }
         var blob = new Blob([bytes], {type:'application/pdf'});
         var url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
+        if(_preOpenedTab && !_preOpenedTab.closed){
+          _preOpenedTab.location.href = url;
+        } else {
+          // Önceden açılan sekme kullanıcı tarafından kapatıldıysa veya
+          // tarayıcı yine de engellediyse, yedek olarak tekrar deneriz.
+          window.open(url, '_blank');
+        }
       }catch(e){
+        if(_preOpenedTab && !_preOpenedTab.closed) _preOpenedTab.close();
         console.error('PDF açılamadı:', e);
         if(typeof toast==='function') toast('❌ PDF açılamadı','error');
       }
       return;
     }
+    if(_preOpenedTab && !_preOpenedTab.closed) _preOpenedTab.close(); // PDF değilse boş sekmeye gerek yok
     var old = document.getElementById('at-ruhsat-viewer');
     if(old) old.remove();
     var wrap = document.createElement('div');
@@ -18598,6 +18614,7 @@ function _atRuhsatGoster(aracId){
       + '<button onclick="event.stopPropagation();this.parentElement.remove();" style="position:fixed;top:20px;right:20px;width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:20px;cursor:pointer;">×</button>';
     document.body.appendChild(wrap);
   }).catch(function(e){
+    if(_preOpenedTab && !_preOpenedTab.closed) _preOpenedTab.close();
     console.error('Ruhsat indirilemedi:', e);
     if(typeof toast==='function') toast('❌ Ruhsat indirilemedi: '+(e.message||'bilinmeyen hata'),'error');
   });
