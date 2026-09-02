@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="v2026.08.26-89">
+<meta name="app-version" content="v2026.08.26-90">
 <meta name="color-scheme" content="dark">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
@@ -1696,7 +1696,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.08.26-89</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.08.26-90</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -3547,13 +3547,14 @@ setInterval(updateLoginClock, 30000);
 <div class="page-inner">
  <div class="hero ucret">
  <div>
- <div style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Eylül – Haziran · 10 Ay</div>
+ <div style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;" id="ucret-ay-araligi-label">Eylül – Mayıs · 9 Ay</div>
  <div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;margin-bottom:6px;">Ücret Yönetimi</div>
  <div style="font-size:13px;color:var(--muted2);margin-bottom:16px;" id="ucret-sub-label">Aylık ödeme takibi</div>
  <div style="display:flex;gap:8px;flex-wrap:wrap;">
  <button class="btn btn-green" onclick="ucretGoSoforList();gotoU('ucret-ogrenci')">Öğrenci Ödemelerine Git</button>
  <button class="btn btn-ghost btn-sm" onclick="exportUcretExcel()" style="display:flex;align-items:center;gap:6px;">Excel'e Aktar</button>
  <button class="btn btn-ghost btn-sm" onclick="printUcretGenel()" style="display:flex;align-items:center;gap:6px;">Yazdır</button>
+ <button class="btn btn-ghost btn-sm" onclick="_ucretAyEklemeAc()" style="display:flex;align-items:center;gap:6px;">+ Ay Ekle</button>
  </div>
  </div>
  <div style="opacity:.1;flex-shrink:0;margin-left:20px;"><svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
@@ -5850,14 +5851,29 @@ function renderUcretSoforList(){
     // Şoför-öğrenci direkt bağlantı sistemi
     const _sogrL = _getSoforOgrenciListesi(drv.id);
     const total = _sogrL.length;
-    let paidCount = 0, bekleyenCount = 0;
+    // Hangi aydan ne kadar alacak kaldığı + toplam alacak hesabı.
+    // Bir ayın "kalan" tutarı, o ay için ödenmemiş öğrencilerin o ayki
+    // (varsa girilmiş, yoksa 0 kabul edilen) tutarlarının toplamıdır.
+    const ayAlacak = {}; // key -> toplam kalan tutar
+    let toplamAlacak = 0;
     _sogrL.forEach(o => {
       const s = students.find(st => st.id === o.id) || o;
       const aktifAylar = getAktifAylar(s);
-      const t = calcStudentTotalsForAylar(o.id, aktifAylar);
-      if(t.paidMonths >= aktifAylar.length && aktifAylar.length > 0) paidCount++;
-      else bekleyenCount++;
+      const p = getStudentPayment(o.id);
+      aktifAylar.forEach(a => {
+        const rec = p[a.key];
+        if(!rec || !rec.paid){
+          const tutar = Number(rec && rec.amount || 0);
+          if(tutar > 0){
+            ayAlacak[a.key] = (ayAlacak[a.key]||0) + tutar;
+            toplamAlacak += tutar;
+          }
+        }
+      });
     });
+    const kalanAyListesi = AYLAR.filter(a => ayAlacak[a.key] > 0);
+    const gosterilecek = kalanAyListesi.slice(0,3);
+    const fazlaAySayisi = kalanAyListesi.length - gosterilecek.length;
     const drvRoutes = routes.filter(r => r._soforId === drv.id);
     const col = drv.color || 'var(--brand)';
     const colMap = {'var(--brand)':'#c8371a','var(--green)':'#22c55e','var(--blue)':'#3b82f6','var(--purple)':'#8b5cf6','var(--amber)':'#f59e0b'};
@@ -5871,12 +5887,13 @@ function renderUcretSoforList(){
       <div style="flex:1;min-width:0;">
         <div style="font-family:Syne,sans-serif;font-size:14px;font-weight:800;color:#fff;">${escHtml(drv.name)}</div>
         <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px;">${drvRoutes.length} rota · ${total} öğrenci</div>
-        <div style="display:flex;gap:8px;margin-top:5px;">
-          ${paidCount > 0 ? `<span style="font-size:10px;font-weight:700;color:var(--green);">✓ ${paidCount} tam ödedi</span>` : ''}
-          ${bekleyenCount > 0 ? `<span style="font-size:10px;font-weight:700;color:var(--red);">⚠ ${bekleyenCount} bekliyor</span>` : ''}
-          ${(total - paidCount - bekleyenCount) > 0 ? `<span style="font-size:10px;color:rgba(255,255,255,.3);">+ ${total - paidCount - bekleyenCount} kaydedilmemiş</span>` : ''}
-          ${total===0 ? `<span style="font-size:10px;color:rgba(255,255,255,.25);">Öğrenci eklenmemiş</span>` : ''}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px;">
+          ${toplamAlacak > 0
+            ? gosterilecek.map(a=>`<span style="font-size:10px;font-weight:700;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:2px 6px;">${a.label}: ${fmt(ayAlacak[a.key])}</span>`).join('')
+              + (fazlaAySayisi > 0 ? `<span style="font-size:10px;color:rgba(255,255,255,.3);">+${fazlaAySayisi} ay daha</span>` : '')
+            : (total > 0 ? `<span style="font-size:10px;font-weight:700;color:var(--green);">✓ Tüm ödemeler tamam</span>` : `<span style="font-size:10px;color:rgba(255,255,255,.25);">Öğrenci eklenmemiş</span>`)}
         </div>
+        ${toplamAlacak > 0 ? `<div style="font-size:11px;font-weight:800;color:var(--amber);margin-top:6px;">Toplam Alacak: ${fmt(toplamAlacak)}</div>` : ''}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;" onclick="event.stopPropagation()">
         <button onclick="event.stopPropagation();openEditSoforModal('${drv.id}')"
@@ -7109,6 +7126,8 @@ function loadPayments(){
  } else {
    window.addEventListener('firebase-ready', ()=>_loadPaymentsFromFirebase(), {once:true});
  }
+ // Ücret takvimi ay listesini de yükle (varsayılan 9 ay, eklenmişse genişler)
+ _loadUcretAyKonfig();
 }
 
 // Aynı sınıf hata Ücret ödemelerinde de riskliydi (GLOBAL düğüm + tam üzerine yazma) —
@@ -9462,12 +9481,12 @@ function _renderOverduePanel(){
  const nowYear  = now.getFullYear();
  // Akademik yıl başlangıcı: Eylül
  const akademikYilBaslangic = nowMonth >= 9 ? nowYear : nowYear - 1;
- const AYLAR_SIRALI = [
-  {key:'eylul',  m:9},  {key:'ekim',   m:10}, {key:'kasim',  m:11},
-  {key:'aralik', m:12}, {key:'ocak',   m:1},  {key:'subat',  m:2},
-  {key:'mart',   m:3},  {key:'nisan',  m:4},  {key:'mayis',  m:5},
-  {key:'haziran',m:6},
- ];
+ // ÖNEMLİ: Sabit bir ay listesi yerine GÜNCEL AYLAR dizisi kullanılıyor —
+ // aksi halde AYLAR'da olmayan bir ay (örn. Haziran eklenmemişse) burada hâlâ
+ // kontrol edilip, artık takip edilmeyen bir ay için tüm öğrenciler yanlışlıkla
+ // "gecikmiş" görünürdü.
+ const AY_KEY_TO_MONTH = {eylul:9,ekim:10,kasim:11,aralik:12,ocak:1,subat:2,mart:3,nisan:4,mayis:5,haziran:6,temmuz:7,agustos:8};
+ const AYLAR_SIRALI = AYLAR.map(a=>({key:a.key, m:AY_KEY_TO_MONTH[a.key]})).filter(a=>a.m);
  // Bugüne kadar geçmiş aylar
  const gecmisAylar = AYLAR_SIRALI.filter(a => {
   const ayYil = a.m >= 9 ? akademikYilBaslangic : akademikYilBaslangic + 1;
@@ -9572,6 +9591,12 @@ function _checkBackupReminder(){
 // 
 // ÜCRET YÖNETİMİ
 // 
+// ── ÜCRET YÖNETİMİ: AY LİSTESİ ──────────────────────────────
+// Varsayılan: Eylül–Mayıs (9 ay, standart eğitim yılı). Gerekirse (örn. yaz
+// aylarına kayıt uzarsa) "+ Ay Ekle" ile Haziran/Temmuz/Ağustos sona eklenebilir.
+// AYLAR dizisi PUSH/SORT ile İÇERİDEN değiştirilir (const ama mutasyona açık) —
+// böylece bu diziyi zaten kullanan tüm fonksiyonlar (aşağıda ~30 yer) otomatik
+// olarak güncel ay listesini görür, ayrıca değiştirmeye gerek kalmaz.
 const AYLAR=[
  {key:'eylul', label:'Eylül'},
  {key:'ekim', label:'Ekim'},
@@ -9582,8 +9607,100 @@ const AYLAR=[
  {key:'mart', label:'Mart'},
  {key:'nisan', label:'Nisan'},
  {key:'mayis', label:'Mayıs'},
- {key:'haziran',label:'Haziran'},
 ];
+// Eklenebilecek tüm ayların referans sırası (akademik yıl: Eylül→Ağustos).
+// AYLAR'a yeni ay eklenirken/sıralanırken bu referans kullanılır.
+const AY_REF_SIRALI=[
+ {key:'eylul', label:'Eylül'},{key:'ekim', label:'Ekim'},{key:'kasim', label:'Kasım'},
+ {key:'aralik', label:'Aralık'},{key:'ocak', label:'Ocak'},{key:'subat', label:'Şubat'},
+ {key:'mart', label:'Mart'},{key:'nisan', label:'Nisan'},{key:'mayis', label:'Mayıs'},
+ {key:'haziran',label:'Haziran'},{key:'temmuz',label:'Temmuz'},{key:'agustos',label:'Ağustos'},
+];
+
+// Kayıtlı ay listesini (varsa) localStorage/Firebase'den yükleyip AYLAR'a uygular.
+// Hiç kayıt yoksa varsayılan 9 ay (yukarıdaki) geçerli kalır.
+function _loadUcretAyKonfig(){
+  try{
+    const raw = localStorage.getItem('konseltur_ucret_aylar_v1');
+    if(raw){
+      const keys = JSON.parse(raw);
+      if(Array.isArray(keys) && keys.length) _applyAyKonfig(keys);
+    }
+  }catch(e){}
+  if(window._fbReady){ _loadUcretAyKonfigFromFirebase(); }
+  else { window.addEventListener('firebase-ready', ()=>_loadUcretAyKonfigFromFirebase(), {once:true}); }
+}
+function _loadUcretAyKonfigFromFirebase(){
+  if(!window._fbDb || !window._fbOnValue || !window._fbRef) return;
+  window._fbOnValue(window._fbRef(window._fbDb,'konseltur/GLOBAL/ucret_ay_konfig'), function(snap){
+    if(snap && snap.exists()){
+      const keys = snap.val();
+      if(Array.isArray(keys) && keys.length) _applyAyKonfig(keys);
+    }
+  });
+}
+function _applyAyKonfig(keys){
+  const yeni = keys.map(k => AY_REF_SIRALI.find(a=>a.key===k)).filter(Boolean);
+  yeni.sort((a,b)=> AY_REF_SIRALI.findIndex(x=>x.key===a.key) - AY_REF_SIRALI.findIndex(x=>x.key===b.key));
+  if(!yeni.length) return;
+  AYLAR.length = 0; // referansı bozmadan içeriği değiştir
+  yeni.forEach(a=>AYLAR.push(a));
+  _refreshAyBagimliEkranlar();
+}
+function _refreshAyBagimliEkranlar(){
+  _updateUcretAyBasligi();
+  if(typeof renderUcretOgrenci==='function') renderUcretOgrenci();
+  if(typeof renderUcretGenel==='function' && currentApp==='ucret') renderUcretGenel();
+  if(typeof renderUcretSoforList==='function') renderUcretSoforList();
+}
+function _updateUcretAyBasligi(){
+  const el = document.getElementById('ucret-ay-araligi-label');
+  if(el && AYLAR.length){ el.textContent = AYLAR[0].label+' – '+AYLAR[AYLAR.length-1].label+' · '+AYLAR.length+' Ay'; }
+}
+
+// "+ Ay Ekle" — henüz listede olmayan bir ayı seçip sona ekler
+function _ucretAyEklemeAc(){
+  const mevcutKeys = new Set(AYLAR.map(a=>a.key));
+  const eklenebilir = AY_REF_SIRALI.filter(a=>!mevcutKeys.has(a.key));
+  if(!eklenebilir.length){ if(typeof toast==='function') toast('Eklenebilecek başka ay yok — tüm aylar zaten listede','info'); return; }
+  const old = document.getElementById('ucret-ay-ekle-modal');
+  if(old) old.remove();
+  const wrap=document.createElement('div');
+  wrap.id='ucret-ay-ekle-modal';
+  wrap.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+  wrap.onclick=function(e){ if(e.target===wrap) wrap.remove(); };
+  wrap.innerHTML = '<div style="background:#111726;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px;max-width:320px;width:100%;" onclick="event.stopPropagation()">'
+    +'<div style="font-family:Syne,sans-serif;font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;">Yeni Ay Ekle</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:14px;">Ücret takvimine eklenecek ayı seçin. Bu değişiklik tüm cihazlarda görünür.</div>'
+    +'<select id="ucret-ay-ekle-select" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:#0b0f1a;color:#fff;font-size:13px;margin-bottom:14px;">'
+      +eklenebilir.map(a=>'<option value="'+a.key+'">'+a.label+'</option>').join('')
+    +'</select>'
+    +'<div style="display:flex;gap:8px;">'
+      +'<button onclick="document.getElementById(\'ucret-ay-ekle-modal\').remove()" style="flex:1;padding:10px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.6);font-weight:700;font-size:12px;cursor:pointer;font-family:Outfit,sans-serif;">Vazgeç</button>'
+      +'<button onclick="_ucretAyEkleOnayla()" style="flex:1;padding:10px;border-radius:9px;border:none;background:var(--green);color:#062;font-weight:800;font-size:12px;cursor:pointer;font-family:Outfit,sans-serif;">Ekle</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(wrap);
+}
+function _ucretAyEkleOnayla(){
+  const sel = document.getElementById('ucret-ay-ekle-select');
+  const key = sel && sel.value;
+  const modal = document.getElementById('ucret-ay-ekle-modal');
+  if(!key || AYLAR.some(a=>a.key===key)){ if(modal) modal.remove(); return; }
+  const ref = AY_REF_SIRALI.find(a=>a.key===key);
+  if(!ref){ if(modal) modal.remove(); return; }
+  AYLAR.push(ref);
+  AYLAR.sort((a,b)=> AY_REF_SIRALI.findIndex(x=>x.key===a.key) - AY_REF_SIRALI.findIndex(x=>x.key===b.key));
+  const keys = AYLAR.map(a=>a.key);
+  try{ localStorage.setItem('konseltur_ucret_aylar_v1', JSON.stringify(keys)); }catch(e){}
+  if(window._fbReady && window._fbDb){
+    window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/ucret_ay_konfig'), keys).catch(function(){});
+  }
+  if(modal) modal.remove();
+  _refreshAyBagimliEkranlar();
+  if(typeof toast==='function') toast('✅ '+ref.label+' ücret takvimine eklendi','success');
+}
+
 
 function getStudentPayment(sid){
  if(!payments[sid]) payments[sid]={};
@@ -9731,6 +9848,7 @@ function renderUcretGenel(){
  try {
 
  const el=id=>document.getElementById(id);
+ _updateUcretAyBasligi();
 
  // Şoförlere kayıtlı toplam öğrenci sayısını al
  const _ugSchIdx=getSchoolIdx(_activeSchoolKey);
@@ -9842,12 +9960,18 @@ function openPaymentModal(sid){
  }
  // Aktif aylar - kayıt ayından itibaren
  const _aktifAylar = getAktifAylar(s);
- // Ay grupları: Güz / Kış / Bahar
- const AY_GRUPLARI = {
-  guz:   ['eylul','ekim','kasim','aralik'],
-  kis:   ['ocak','subat','mart'],
-  bahar: ['nisan','mayis','haziran'],
- };
+ // Ay grupları: Güz / Kış / Bahar — AYLAR'ın GÜNCEL içeriğine göre dinamik
+ // oluşturulur (haziran/temmuz/ağustos sonradan eklenmişse otomatik "bahar"
+ // grubuna dahil olur; henüz eklenmemişse hiç görünmez).
+ function _ayGrubuAdi(key){
+  const idx = AY_REF_SIRALI.findIndex(a=>a.key===key);
+  if(idx < 0) return 'bahar';
+  if(idx <= 3) return 'guz';
+  if(idx <= 6) return 'kis';
+  return 'bahar';
+ }
+ const AY_GRUPLARI = {guz:[], kis:[], bahar:[]};
+ AYLAR.forEach(a=>{ AY_GRUPLARI[_ayGrubuAdi(a.key)].push(a.key); });
  function renderAyGrubu(keyler){
   return keyler.map(key=>{
    const a=AYLAR.find(x=>x.key===key)||{key,label:key};
@@ -9978,29 +10102,40 @@ async function savePayments(){
  // Açıklamayı öğrenciye kaydet
  const _pmAcEl = document.getElementById('pm-aciklama');
  if(_pmAcEl && _s){ _s.aciklama = _pmAcEl.value.trim(); }
- const _doAfterSave = ()=>{
-   closePaymentModal();
-   renderUcretOgrenci();
-   if(currentApp==='ucret') renderUcretGenel();
-   toast('✅ Ödeme kaydedildi');
-   flashSaveDot();
- };
- // Güvenlik kilidi: Firebase'in son halini görmeden GLOBAL ödeme düğümünün üzerine yazma
- _lastPaymentsSaveAt = Date.now();
- await _waitPaymentsSync();
- if(window._fbReady && window._fbDb){
-   // Global ID ile doğrudan GLOBAL/payments path'ine yaz — tüm cihazlar aynı path'i okur
-   window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/ucret_payments'), payments)
-     .then(()=>{ _clearPendingPay(); _doAfterSave(); })
-     .catch(e=>{ console.warn('Firebase ödeme kayıt:',e); _markPendingPay(); _doAfterSave(); });
-   // Ayrıca okul bazlı path'e de yaz (geriye uyumluluk)
-   if(_s){
-     const schIdx = _s._schIdx !== undefined ? _s._schIdx : _s.school;
-     const schKey = (SCHOOLS[schIdx]||SCHOOLS[0]).key;
-     window._fbSet(window._fbRef(window._fbDb,'konseltur/'+schKey+'/payments'), payments)
-       .catch(()=>{});
-   }
- } else { _markPendingPay(); _doAfterSave(); }
+
+ // HIZ DÜZELTMESİ: Önceden arayüz (modal kapama, liste tazeleme, "kaydedildi"
+ // bildirimi) ANCAK Firebase'e ağ üzerinden yazma TAMAMLANDIKTAN SONRA
+ // gösteriliyordu — bu da her kayıtta birkaç saniyelik "kasma" hissi
+ // yaratıyordu ("bir öğrenci ödeme yaptı işaretleyip kaydet diyorum 4 saniye
+ // gibi bir süre bekliyor"). Artık veri zaten yukarıda yerel olarak (ve
+ // localStorage'a) kaydedildiği için arayüz HEMEN güncelleniyor; Firebase'e
+ // yazma işlemi arka planda, kullanıcı beklemeden devam ediyor. Senkron
+ // öncesi yazmayı önleyen zaman damgalı kilit (_lastPaymentsSaveAt, yukarıda
+ // ayarlandı) ve _waitPaymentsSync() koruması aynen korunuyor — sadece artık
+ // kullanıcıyı bloklamıyor.
+ closePaymentModal();
+ renderUcretOgrenci();
+ if(currentApp==='ucret') renderUcretGenel();
+ toast('✅ Ödeme kaydedildi');
+ flashSaveDot();
+
+ // Firebase'e arka planda yaz (kullanıcıyı bekletmeden)
+ (async ()=>{
+   await _waitPaymentsSync();
+   if(window._fbReady && window._fbDb){
+     // Global ID ile doğrudan GLOBAL/payments path'ine yaz — tüm cihazlar aynı path'i okur
+     window._fbSet(window._fbRef(window._fbDb,'konseltur/GLOBAL/ucret_payments'), payments)
+       .then(()=>{ _clearPendingPay(); })
+       .catch(e=>{ console.warn('Firebase ödeme kayıt:',e); _markPendingPay(); });
+     // Ayrıca okul bazlı path'e de yaz (geriye uyumluluk)
+     if(_s){
+       const schIdx = _s._schIdx !== undefined ? _s._schIdx : _s.school;
+       const schKey = (SCHOOLS[schIdx]||SCHOOLS[0]).key;
+       window._fbSet(window._fbRef(window._fbDb,'konseltur/'+schKey+'/payments'), payments)
+         .catch(()=>{});
+     }
+   } else { _markPendingPay(); }
+ })();
 }
 
 
@@ -10951,8 +11086,8 @@ function exportUcretExcel(){
  if(!students.length){ toast('Öğrenci bulunamadı','error'); return; }
  toast('Excel hazırlanıyor...','info');
 
- const AYLAR_LIST = ['eylul','ekim','kasim','aralik','ocak','subat','mart','nisan','mayis','haziran'];
- const AYLAR_LABEL = ['Eylül','Ekim','Kasım','Aralık','Ocak','Şubat','Mart','Nisan','Mayıs','Haziran'];
+ const AYLAR_LIST = AYLAR.map(a=>a.key);
+ const AYLAR_LABEL = AYLAR.map(a=>a.label);
 
  // Sayfa 1: Aylık özet tablosu
  const header1 = ['Ad Soyad', ...AYLAR_LABEL, 'Ödenen Ay', 'Kalan Ay', 'Durum'];
@@ -10963,7 +11098,7 @@ function exportUcretExcel(){
  const p = payments[s.id] || {};
  const aylik = AYLAR_LIST.map(ay =>p[ay]?.paid ? '' : '–');
  const odenen = AYLAR_LIST.filter(ay =>p[ay]?.paid).length;
- const kalan = 10 - odenen;
+ const kalan = AYLAR_LIST.length - odenen;
  return [
  s.name,
  ...aylik,
@@ -17328,7 +17463,7 @@ function veliBasvuruOnayla(key){
     // Aylık ücreti varsa payments'a ekle
     if(v.ucret && v.kayitAy){
       if(!payments[yeniId]) payments[yeniId] = {};
-      var AYLAR_LOCAL = ['eylul','ekim','kasim','aralik','ocak','subat','mart','nisan','mayis','haziran'];
+      var AYLAR_LOCAL = AYLAR.map(function(a){ return a.key; });
       var baslangic = AYLAR_LOCAL.indexOf(v.kayitAy);
       if(baslangic >= 0){
         AYLAR_LOCAL.slice(baslangic).forEach(function(ay){
