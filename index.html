@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="v2026.08.26-92">
+<meta name="app-version" content="v2026.08.26-93">
 <meta name="color-scheme" content="dark">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#c8371a">
@@ -1696,7 +1696,7 @@ try{
 <body>
 
 <!-- SÜRÜM ETİKETİ - güncelleme kontrolü için -->
-<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.08.26-92</div>
+<div id="app-version-badge" style="position:fixed;bottom:4px;right:4px;z-index:999999;background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:9px;padding:2px 6px;border-radius:4px;font-family:monospace;pointer-events:none;user-select:none;">v2026.08.26-93</div>
 <!-- ŞİFRE EKRANI -->
 <div id="password-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;">
   <!-- arka plan -->
@@ -4039,14 +4039,7 @@ setInterval(updateLoginClock, 30000);
        style="width:100%;padding:7px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;color:rgba(255,255,255,.7);font-size:12px;font-family:Outfit,sans-serif;outline:none;box-sizing:border-box;">
    </div>
  </div>
- <div class="pm-group-label">Güz Dönemi</div>
- <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;" id="pm-months-guz"></div>
- <div style="height:1px;background:var(--border);margin-bottom:10px;"></div>
- <div class="pm-group-label">Kış Dönemi</div>
- <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;" id="pm-months-kis"></div>
- <div style="height:1px;background:var(--border);margin-bottom:10px;"></div>
- <div class="pm-group-label">Bahar Dönemi</div>
- <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;" id="pm-months-bahar"></div>
+ <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;" id="pm-months-tumu"></div>
  <div style="background:var(--card2);border-radius:10px;padding:14px 16px;margin-top:16px;display:flex;justify-content:space-between;align-items:center;">
  <div><div style="font-size:10px;color:var(--muted2);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">Toplam Ödenen</div><div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--green);" id="pm-total">₺0</div></div>
  <div><div style="font-size:10px;color:var(--muted2);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">Ödenen Ay</div><div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#60a5fa;" id="pm-paid-months">0/10</div></div>
@@ -9673,8 +9666,25 @@ function _ogrenciAyEkleOnayla(){
   if(!Array.isArray(s.ekAylar)) s.ekAylar = [];
   if(!s.ekAylar.includes(key)) s.ekAylar.push(key);
   saveData(); // öğrenci kaydını (ekAylar dahil) kalıcı olarak yaz
+  // ÖNEMLİ: Öğrenci-şoför eşleştirme verisi (window._soforOgrenciler) AYRI bir
+  // depoda tutuluyor ve kendi Firebase senkronizasyonu var. Sadece "students"
+  // dizisini güncellemek yeterli değil — o ayrı depo, bir sonraki senkronda
+  // eski (ekAylar'sız) halini geri getirip bu değişikliği sessizce silebilir.
+  // Bu yüzden aynı ekAylar bilgisini oraya da yazıp kaydediyoruz.
+  try{
+    const drvId = window._ucretActiveSoforId;
+    if(drvId && window._soforOgrenciler){
+      const arr = window._soforOgrenciler[String(drvId)] || window._soforOgrenciler[drvId];
+      if(Array.isArray(arr)){
+        const o = arr.find(x=>x.id===_editingStudentId);
+        if(o) o.ekAylar = s.ekAylar.slice();
+      }
+    }
+    if(typeof _saveSoforOgrenciler==='function') _saveSoforOgrenciler();
+  }catch(e){ console.warn('sofor-ogrenci ekAylar senkron hatası:', e); }
   if(modal) modal.remove();
   openPaymentModal(_editingStudentId); // modalı ekstra ay dahil yeniden çiz
+  if(typeof renderUcretOgrenci==='function') renderUcretOgrenci(); // arkadaki listeyi de hemen güncelle
   const ref = AY_REF_SIRALI.find(a=>a.key===key);
   if(typeof toast==='function') toast('✅ '+(ref?ref.label:key)+' — sadece '+s.name+' için eklendi','success');
 }
@@ -9944,20 +9954,7 @@ function openPaymentModal(sid){
  // Modalde GÖSTERİLECEK tüm aylar: standart 9 ay + bu öğrenciye özel eklenmiş
  // ekstra aylar (varsa) — başka hiçbir öğrenciyi etkilemez.
  const _tumGosterilecekAylar = _ucretGosterilecekAylar(s);
- // Ay grupları: Güz / Kış / Bahar — bu öğrencinin GÜNCEL ay listesine göre
- // dinamik oluşturulur (bu öğrenciye Haziran eklenmişse otomatik "bahar"
- // grubuna dahil olur; eklenmemişse hiç görünmez).
- function _ayGrubuAdi(key){
-  const idx = AY_REF_SIRALI.findIndex(a=>a.key===key);
-  if(idx < 0) return 'bahar';
-  if(idx <= 3) return 'guz';
-  if(idx <= 6) return 'kis';
-  return 'bahar';
- }
- const AY_GRUPLARI = {guz:[], kis:[], bahar:[]};
- _tumGosterilecekAylar.forEach(a=>{ AY_GRUPLARI[_ayGrubuAdi(a.key)].push(a.key); });
- function renderAyGrubu(keyler){
-  return keyler.map(key=>{
+ function renderAyHucre(key){
    const a=AY_REF_SIRALI.find(x=>x.key===key)||{key,label:key};
    const mp=p[a.key]||{paid:false,amount:''};
    const isAktif = _aktifAylar.some(ay=>ay.key===key);
@@ -9981,17 +9978,9 @@ function openPaymentModal(sid){
      style="padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.06);background:transparent;color:rgba(255,255,255,.2);font-size:10px;cursor:pointer;transition:.15s;" title="Sıfırla">✕</button>
  </div>
  </div>`;
-  }).join('');
  }
- const guzEl=document.getElementById('pm-months-guz');
- const kisEl=document.getElementById('pm-months-kis');
- const baharEl=document.getElementById('pm-months-bahar');
- if(guzEl) guzEl.innerHTML=renderAyGrubu(AY_GRUPLARI.guz);
- if(kisEl) kisEl.innerHTML=renderAyGrubu(AY_GRUPLARI.kis);
- if(baharEl) baharEl.innerHTML=renderAyGrubu(AY_GRUPLARI.bahar);
- // Eski pm-months varsa temizle (backward compat)
- const legacyEl=document.getElementById('pm-months');
- if(legacyEl) legacyEl.innerHTML='';
+ const tumEl=document.getElementById('pm-months-tumu');
+ if(tumEl) tumEl.innerHTML=_tumGosterilecekAylar.map(a=>renderAyHucre(a.key)).join('');
  updatePmSummary();
  document.getElementById('payment-modal').classList.add('open');
 }
